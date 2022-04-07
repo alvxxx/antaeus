@@ -9,6 +9,9 @@ class BillingService(
     private val dal: AntaeusDal
 ) {
     fun handle() {
-        dal.fetchInvoicesByStatus(InvoiceStatus.PENDING)
+        val invoicesToCharge = dal.fetchInvoicesByStatus(InvoiceStatus.PENDING)
+        invoicesToCharge.forEach {
+            paymentProvider.charge(it)
+        }
     }
 }
