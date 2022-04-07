@@ -10,8 +10,12 @@ class BillingService(
 ) {
     fun handle() {
         val invoicesToCharge = dal.fetchInvoicesByStatus(InvoiceStatus.PENDING)
-        invoicesToCharge.forEach {
-            paymentProvider.charge(it)
+        for (invoice in invoicesToCharge) {
+            val result = paymentProvider.charge(invoice)
+            if (result){
+                invoice.pay()
+                dal.updateInvoice(invoice)
+            }
         }
     }
 }
