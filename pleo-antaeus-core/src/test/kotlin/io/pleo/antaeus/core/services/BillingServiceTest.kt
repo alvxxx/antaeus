@@ -1,6 +1,9 @@
 package io.pleo.antaeus.core.services
 
 import io.mockk.*
+import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
+import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
+import io.pleo.antaeus.core.exceptions.NetworkException
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency
@@ -15,6 +18,9 @@ class BillingServiceTest {
     private val paymentProvider = mockk<PaymentProvider>(relaxed = true) {
         every { charge(match { it.amount.value == BigDecimal(200) }) } returns true
         every { charge(match { it.amount.value == BigDecimal(402) }) } returns false
+        every { charge(match { it.amount.value == BigDecimal(404) }) } throws CustomerNotFoundException(1)
+        every { charge(match { it.amount.value == BigDecimal(400) }) } throws CurrencyMismatchException(1, 1)
+        every { charge(match { it.amount.value == BigDecimal(503) }) } throws NetworkException()
     }
 
     private val sut = BillingService(
@@ -22,8 +28,8 @@ class BillingServiceTest {
         dal = dal
     )
 
-    private fun mockInvoice(mockedResult: BigDecimal, mockedStatus: InvoiceStatus = InvoiceStatus.PENDING): Invoice {
-        return Invoice(1, 1, Money(mockedResult, Currency.USD), mockedStatus)
+    private fun mockInvoice(mockedResult: Int, mockedStatus: InvoiceStatus = InvoiceStatus.PENDING): Invoice {
+        return Invoice(1, 1, Money(BigDecimal(mockedResult), Currency.USD), mockedStatus)
     }
 
     @Test
@@ -37,8 +43,8 @@ class BillingServiceTest {
     @Test
     fun `will charge each invoice fetched`() {
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
-            mockInvoice(BigDecimal(200)),
-            mockInvoice(BigDecimal(400))
+            mockInvoice(200),
+            mockInvoice(400)
         )
 
         sut.handle()
@@ -49,7 +55,7 @@ class BillingServiceTest {
 
     @Test
     fun `will mark invoices to paid when charged successfully`() {
-        val successInvoice = mockInvoice(BigDecimal(200))
+        val successInvoice = mockInvoice(200)
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(successInvoice)
 
         sut.handle()
@@ -59,10 +65,10 @@ class BillingServiceTest {
 
     @Test
     fun `will update invoice status`() {
-        val successInvoice = mockInvoice(BigDecimal.valueOf(200))
+        val successInvoice = mockInvoice(200)
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
             successInvoice,
-            mockInvoice(BigDecimal.valueOf(402))
+            mockInvoice(402)
         )
 
         sut.handle()
