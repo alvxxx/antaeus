@@ -1,8 +1,8 @@
 ## Talking about the solution I want to achieve
-I will delegate the responsibility to schedule the process execution to an external service, the AWS Event Bridge. The billing service will listen an event in AWS SQS queue, that will dispatch the process execution. With asynchronous process handlers in mind, we need to ensure idempotency and a good failure handling.
+I will delegate the schedule process execution responsibility to an external service, the AWS Event Bridge. The billing service will listen an event in AWS SQS queue, that will dispatch the process execution. With asynchronous process handlers in mind, we need to ensure idempotency and a good failure handling.
 
 ## How I will manage the development process?
-I will separate in chapters, and the main branch will contain the final solution.
+I will separate the development in chapters each one with your own branch and the main branch will contain the final solution.
 
 ## Chapter One: MVP
 This chapter goal is to obtain a simple solution, creating as many tests as possible to reach stability for future improvements, as performance and resilience.
@@ -11,7 +11,7 @@ This chapter goal is to obtain a simple solution, creating as many tests as poss
 Before start the development I studied Kotlin to recognize which features that could help me with the solution. I build some poc's with Flows, Channels, Streams. I also studied the docs of Exposed and MockK to understand how to create unit tests with Kotlin. After that I started creating some tests and the first behaviors.
 
 ## 7 April 2022 - 3hs
-I finalized the development of a simple solution of the Billing Service. All the process is synchronous, because in the first moment I just want to build a great battery of tests to improve the solution in the next chapters. I also designed a failure notificator service, that will notify any interested part on errors. 
+I finalized the development of a simple solution of the Billing Service. All the process is synchronous, because in the first moment I just want to build a great battery of tests to improve the solution in the next chapters. I also designed a failure notificator service, that will notify any interested part on errors. For now, the failure notificator only logs the error happened inside the billing process.
 
 ## Developing
 
