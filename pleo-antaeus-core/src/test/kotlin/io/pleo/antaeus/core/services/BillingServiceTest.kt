@@ -60,7 +60,7 @@ class BillingServiceTest {
 
     @Test
     fun `will mark invoices to paid when charged successfully`() {
-        val successInvoice = mockInvoice(200)
+        val successInvoice = spyk(mockInvoice(200))
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(successInvoice)
 
         sut.handle()
