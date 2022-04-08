@@ -2,6 +2,7 @@ package io.pleo.antaeus.core.services
 
 import io.pleo.antaeus.core.events.BusinessErrorEvent
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
+import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
 import io.pleo.antaeus.core.external.FailureHandler
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
@@ -23,7 +24,8 @@ class BillingService(
                 }
             } catch (exception: Exception) {
                 when(exception) {
-                    is CurrencyMismatchException -> {
+                    is CurrencyMismatchException,
+                    is CustomerNotFoundException -> {
                         val event = BusinessErrorEvent(invoice.id, "Invoice", exception = exception)
                         failureHandler.notify(event)
                     }

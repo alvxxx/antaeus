@@ -98,4 +98,22 @@ class BillingServiceTest {
             assertTrue(it.exception?.message == expectedException.message)
         }) }
     }
+
+    @Test
+    fun `will notify invoice failure when the customer was not found`() {
+        every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
+            mockInvoice(404),
+            mockInvoice(200)
+        )
+
+        sut.handle()
+
+        val expectedException = CustomerNotFoundException(1)
+        verify(exactly = 1) { failureHandler.notify(withArg <BusinessErrorEvent> {
+            assertTrue(it.resourceName == "Invoice")
+            assertTrue(it.resourceId == 1)
+            assertTrue(it.reason == null)
+            assertTrue(it.exception?.message == expectedException.message)
+        }) }
+    }
 }
