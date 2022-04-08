@@ -1,6 +1,7 @@
 package io.pleo.antaeus.core.services
 
 import io.mockk.*
+import io.pleo.antaeus.core.events.ApplicationErrorEvent
 import io.pleo.antaeus.core.events.BusinessErrorEvent
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
 import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
@@ -114,6 +115,23 @@ class BillingServiceTest {
             assertTrue(it.resourceId == 1)
             assertTrue(it.reason == null)
             assertTrue(it.exception?.message == expectedException.message)
+        }) }
+    }
+
+    @Test
+    fun `will notify invoice failure when a network exception occurs`() {
+        every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
+            mockInvoice(503),
+            mockInvoice(200)
+        )
+
+        sut.handle()
+
+        val expectedException = NetworkException()
+        verify(exactly = 1) { failureHandler.notify(withArg <ApplicationErrorEvent> {
+            assertTrue(it.resourceName == "Invoice")
+            assertTrue(it.resourceId == 1)
+            assertTrue(it.exception.message == expectedException.message)
         }) }
     }
 }
