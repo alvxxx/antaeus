@@ -134,4 +134,20 @@ class BillingServiceTest {
             assertTrue(it.exception.message == expectedException.message)
         }) }
     }
+
+    @Test
+    fun `will notify invoice failure when a invoice charge fail`() {
+        every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
+            mockInvoice(402),
+            mockInvoice(200)
+        )
+
+        sut.handle()
+
+        verify(exactly = 1) { failureHandler.notify(withArg <BusinessErrorEvent> {
+            assertTrue(it.resourceName == "Invoice")
+            assertTrue(it.resourceId == 1)
+            assertTrue(it.reason == "Invoice charge declined due lack of account balance of customer '1'")
+        }) }
+    }
 }

@@ -18,15 +18,19 @@ class BillingService(
 ) {
     fun handle() {
         val invoicesToCharge = dal.fetchInvoicesByStatus(InvoiceStatus.PENDING)
+        var event: FailureEvent?
         for (invoice in invoicesToCharge) {
+            event = null
             try {
                 val result = paymentProvider.charge(invoice)
                 if (result) {
                     invoice.pay()
                     dal.updateInvoice(invoice)
+                } else {
+                    val reason = "Invoice charge declined due lack of account balance of customer '${invoice.customerId}'"
+                    event = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, reason)
                 }
             } catch (exception: Exception) {
-                var event: FailureEvent? = null
                 when(exception) {
                     is CurrencyMismatchException,
                     is CustomerNotFoundException
@@ -35,6 +39,7 @@ class BillingService(
                     is NetworkException
                         ->  event = ApplicationErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
                 }
+            } finally {
                 if (event != null) {
                     failureHandler.notify(event)
                 }
