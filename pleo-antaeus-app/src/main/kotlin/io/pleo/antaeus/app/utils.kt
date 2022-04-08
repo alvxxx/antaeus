@@ -1,10 +1,13 @@
 
+import io.pleo.antaeus.core.events.FailureEvent
+import io.pleo.antaeus.core.external.FailureNotificator
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import io.pleo.antaeus.models.Money
+import mu.KotlinLogging
 import java.math.BigDecimal
 import kotlin.random.Random
 
@@ -35,6 +38,16 @@ internal fun getPaymentProvider(): PaymentProvider {
     return object : PaymentProvider {
         override fun charge(invoice: Invoice): Boolean {
                 return Random.nextBoolean()
+        }
+    }
+}
+
+internal fun getFailureNotificator(): FailureNotificator {
+    return object : FailureNotificator {
+        val logger = KotlinLogging.logger {}
+
+        override fun notify(failure: FailureEvent) {
+            logger.trace { "The following failure occurred: $failure" }
         }
     }
 }

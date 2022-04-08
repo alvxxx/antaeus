@@ -16,4 +16,6 @@ dependencies {
     implementation(project(":pleo-antaeus-rest"))
     implementation(project(":pleo-antaeus-core"))
     implementation(project(":pleo-antaeus-models"))
+
+    implementation("io.github.microutils:kotlin-logging:2.1.21")
 }
