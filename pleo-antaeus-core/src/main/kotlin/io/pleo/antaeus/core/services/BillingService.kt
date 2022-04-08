@@ -6,7 +6,7 @@ import io.pleo.antaeus.core.events.FailureEvent
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
 import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
 import io.pleo.antaeus.core.exceptions.NetworkException
-import io.pleo.antaeus.core.external.FailureHandler
+import io.pleo.antaeus.core.external.FailureNotificator
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Invoice
@@ -15,7 +15,7 @@ import io.pleo.antaeus.models.InvoiceStatus
 class BillingService(
     private val paymentProvider: PaymentProvider,
     private val dal: AntaeusDal,
-    private val failureHandler: FailureHandler
+    private val failureNotificator: FailureNotificator
 ) {
     fun handle() {
         val invoicesToCharge = dal.fetchInvoicesByStatus(InvoiceStatus.PENDING)
@@ -27,7 +27,7 @@ class BillingService(
                 catchFailureEvent(exception, invoice)
             }
             if (event != null) {
-                failureHandler.notify(event)
+                failureNotificator.notify(event)
             }
         }
     }

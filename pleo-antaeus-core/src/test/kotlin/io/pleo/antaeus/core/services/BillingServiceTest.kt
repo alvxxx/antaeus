@@ -6,7 +6,7 @@ import io.pleo.antaeus.core.events.BusinessErrorEvent
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
 import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
 import io.pleo.antaeus.core.exceptions.NetworkException
-import io.pleo.antaeus.core.external.FailureHandler
+import io.pleo.antaeus.core.external.FailureNotificator
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency
@@ -26,12 +26,12 @@ class BillingServiceTest {
         every { charge(match { it.amount.value == BigDecimal(400) }) } throws CurrencyMismatchException(1, 1)
         every { charge(match { it.amount.value == BigDecimal(503) }) } throws NetworkException()
     }
-    private val failureHandler = mockk<FailureHandler>(relaxed = true)
+    private val failureNotificator = mockk<FailureNotificator>(relaxed = true)
 
     private val sut = BillingService(
         paymentProvider = paymentProvider,
         dal = dal,
-        failureHandler = failureHandler
+        failureNotificator = failureNotificator
     )
 
     private fun mockInvoice(mockedResult: Int, mockedStatus: InvoiceStatus = InvoiceStatus.PENDING): Invoice {
@@ -92,7 +92,7 @@ class BillingServiceTest {
         sut.handle()
 
         val expectedException = CurrencyMismatchException(1, 1)
-        verify(exactly = 1) { failureHandler.notify(withArg <BusinessErrorEvent> {
+        verify(exactly = 1) { failureNotificator.notify(withArg <BusinessErrorEvent> {
             assertTrue(it.resourceName == "Invoice")
             assertTrue(it.resourceId == 1)
             assertTrue(it.reason == null)
@@ -110,7 +110,7 @@ class BillingServiceTest {
         sut.handle()
 
         val expectedException = CustomerNotFoundException(1)
-        verify(exactly = 1) { failureHandler.notify(withArg <BusinessErrorEvent> {
+        verify(exactly = 1) { failureNotificator.notify(withArg <BusinessErrorEvent> {
             assertTrue(it.resourceName == "Invoice")
             assertTrue(it.resourceId == 1)
             assertTrue(it.reason == null)
@@ -128,7 +128,7 @@ class BillingServiceTest {
         sut.handle()
 
         val expectedException = NetworkException()
-        verify(exactly = 1) { failureHandler.notify(withArg <ApplicationErrorEvent> {
+        verify(exactly = 1) { failureNotificator.notify(withArg <ApplicationErrorEvent> {
             assertTrue(it.resourceName == "Invoice")
             assertTrue(it.resourceId == 1)
             assertTrue(it.exception.message == expectedException.message)
@@ -144,7 +144,7 @@ class BillingServiceTest {
 
         sut.handle()
 
-        verify(exactly = 1) { failureHandler.notify(withArg <BusinessErrorEvent> {
+        verify(exactly = 1) { failureNotificator.notify(withArg <BusinessErrorEvent> {
             assertTrue(it.resourceName == "Invoice")
             assertTrue(it.resourceId == 1)
             assertTrue(it.reason == "Invoice charge declined due lack of account balance of customer '1'")
