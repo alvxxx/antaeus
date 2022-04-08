@@ -19,23 +19,18 @@ class BillingService(
 ) {
     fun handle() {
         val invoicesToCharge = dal.fetchInvoicesByStatus(InvoiceStatus.PENDING)
-        var event: FailureEvent?
-        for (invoice in invoicesToCharge) {
-            event = try {
-                tryChargeInvoice(invoice)
-            } catch (exception: Exception) {
-                catchFailureEvent(exception, invoice)
-            }
-            if (event != null) {
-                failureNotificator.notify(event)
+        invoicesToCharge.forEach {
+            val failureEvent = try { chargeInvoice(it) } catch (ex: Exception) { getFailureEvent(ex, it) }
+            if (failureEvent != null) {
+                failureNotificator.notify(failureEvent)
             }
         }
     }
 
-    private fun tryChargeInvoice(invoice: Invoice): FailureEvent? {
+    private fun chargeInvoice(invoice: Invoice): FailureEvent? {
         var event: FailureEvent? = null
-        val result = paymentProvider.charge(invoice)
-        if (result) {
+        val wasCharged = paymentProvider.charge(invoice)
+        if (wasCharged) {
             invoice.pay()
             dal.updateInvoice(invoice)
         } else {
@@ -45,7 +40,7 @@ class BillingService(
         return event
     }
 
-    private fun catchFailureEvent(exception: Exception, invoice: Invoice): FailureEvent? {
+    private fun getFailureEvent(exception: Exception, invoice: Invoice): FailureEvent? {
         var event: FailureEvent? = null
         when (exception) {
             is CurrencyMismatchException,
