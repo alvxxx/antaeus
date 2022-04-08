@@ -60,7 +60,7 @@ class BillingServiceTest {
     }
 
     @Test
-    fun `will mark invoices to paid when charged successfully`() {
+    fun `will mark invoices as paid when customer charged successfully`() {
         val successInvoice = spyk(mockInvoice(200))
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(successInvoice)
 
@@ -70,7 +70,7 @@ class BillingServiceTest {
     }
 
     @Test
-    fun `will update invoice status`() {
+    fun `will persist invoice status changes on dao`() {
         val successInvoice = mockInvoice(200)
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
             successInvoice,
@@ -101,7 +101,7 @@ class BillingServiceTest {
     }
 
     @Test
-    fun `will notify invoice failure when the customer was not found`() {
+    fun `will notify invoice charge failure when the customer was not found`() {
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
             mockInvoice(404),
             mockInvoice(200)
@@ -136,7 +136,7 @@ class BillingServiceTest {
     }
 
     @Test
-    fun `will notify invoice failure when a invoice charge fail`() {
+    fun `will notify invoice charge failure when a invoice charge declined`() {
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
             mockInvoice(402),
             mockInvoice(200)
