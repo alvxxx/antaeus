@@ -9,6 +9,7 @@ import io.pleo.antaeus.core.exceptions.NetworkException
 import io.pleo.antaeus.core.external.FailureHandler
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
+import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 
 class BillingService(
@@ -20,30 +21,39 @@ class BillingService(
         val invoicesToCharge = dal.fetchInvoicesByStatus(InvoiceStatus.PENDING)
         var event: FailureEvent?
         for (invoice in invoicesToCharge) {
-            event = null
-            try {
-                val result = paymentProvider.charge(invoice)
-                if (result) {
-                    invoice.pay()
-                    dal.updateInvoice(invoice)
-                } else {
-                    val reason = "Invoice charge declined due lack of account balance of customer '${invoice.customerId}'"
-                    event = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, reason)
-                }
+            event = try {
+                tryChargeInvoice(invoice)
             } catch (exception: Exception) {
-                when(exception) {
-                    is CurrencyMismatchException,
-                    is CustomerNotFoundException
-                        -> event = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
-
-                    is NetworkException
-                        ->  event = ApplicationErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
-                }
-            } finally {
-                if (event != null) {
-                    failureHandler.notify(event)
-                }
+                catchFailureEvent(exception, invoice)
+            }
+            if (event != null) {
+                failureHandler.notify(event)
             }
         }
+    }
+
+    private fun tryChargeInvoice(invoice: Invoice): FailureEvent? {
+        var event: FailureEvent? = null
+        val result = paymentProvider.charge(invoice)
+        if (result) {
+            invoice.pay()
+            dal.updateInvoice(invoice)
+        } else {
+            val reason = "Invoice charge declined due lack of account balance of customer '${invoice.customerId}'"
+            event = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, reason)
+        }
+        return event
+    }
+
+    private fun catchFailureEvent(exception: Exception, invoice: Invoice): FailureEvent? {
+        var event: FailureEvent? = null
+        when (exception) {
+            is CurrencyMismatchException,
+            is CustomerNotFoundException
+                -> event = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
+            is NetworkException
+                -> event = ApplicationErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
+        }
+        return event
     }
 }
