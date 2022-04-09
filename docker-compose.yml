@@ -7,6 +7,8 @@ services:
       context: .
     ports:
       - "7000:7000"
+    volumes:
+      - "pleo-antaeus-build-cache:/root/.gradle"
 
   awslocal:
     image: localstack/localstack
@@ -20,3 +22,7 @@ services:
     volumes:
       - ./init-aws-services.sh:/docker-entrypoint-initaws.d/entrypoint.sh
       - ./aws-config:/root/.aws/config
+
+volumes:
+  pleo-antaeus-build-cache:
+    
