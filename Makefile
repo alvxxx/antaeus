@@ -1,5 +1,8 @@
-start:
+build-image:
 	docker-compose build pleo-antaeus
+
+start:
+	@make build-image
 	docker-compose up -d pleo-antaeus
 	@make wait-app
 	docker-compose up -d awslocal
