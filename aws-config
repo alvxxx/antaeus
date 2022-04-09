@@ -1,0 +1,2 @@
+[default]
+cli_follow_urlparam=false

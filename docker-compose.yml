@@ -1,0 +1,22 @@
+version: "3"
+
+services:
+  pleo-antaeus:
+    image: pleo-antaeus
+    build:
+      context: .
+    ports:
+      - "7000:7000"
+
+  awslocal:
+    image: localstack/localstack
+    environment:
+      SERVICES: iam, events, sqs, sns
+      DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: "fake"
+      AWS_SECRET_ACCESS_KEY: "fake"
+    ports:
+      - "4566:4566"
+    volumes:
+      - ./init-aws-services.sh:/docker-entrypoint-initaws.d/entrypoint.sh
+      - ./aws-config:/root/.aws/config
