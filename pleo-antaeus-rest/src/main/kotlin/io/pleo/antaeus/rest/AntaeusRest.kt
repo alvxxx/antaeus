@@ -10,9 +10,10 @@ import io.pleo.antaeus.core.exceptions.EntityNotFoundException
 import io.pleo.antaeus.core.services.BillingService
 import io.pleo.antaeus.core.services.CustomerService
 import io.pleo.antaeus.core.services.InvoiceService
-import mu.KotlinLogging
+import org.slf4j.LoggerFactory
+import kotlin.system.measureTimeMillis
 
-private val logger = KotlinLogging.logger {}
+private val logger = LoggerFactory.getLogger("AntaeusRest")
 private val thisFile: () -> Unit = {}
 
 class AntaeusRest(
@@ -35,7 +36,7 @@ class AntaeusRest(
             }
             // Unexpected exception: return HTTP 500
             exception(Exception::class.java) { e, _ ->
-                logger.error(e) { "Internal server error" }
+                logger.error("Internal server error")
             }
             // On 404: return message
             error(404) { ctx -> ctx.json("not found") }
@@ -59,7 +60,10 @@ class AntaeusRest(
                     path("billing") {
                         // URL: /rest/v1/billing
                         post {
-                            billingService.handle()
+                            val executionTime = measureTimeMillis {
+                                billingService.handle()
+                            }
+                            logger.info("The BillingService execution time was: ${executionTime/1000} s")
                             it.json("accepted")
                         }
                     }
