@@ -36,11 +36,12 @@ class AntaeusDal(private val db: Database) {
         }
     }
 
-    fun fetchInvoicesByStatus(status: InvoiceStatus): List<Invoice> {
+    fun fetchInvoicePageByStatus(status: InvoiceStatus, take: Int, pageNumber: Int): List<Invoice> {
         Thread.sleep(Random.nextLong(5  * 1000, 2 * 60 * 1000))
         return transaction(db) {
             InvoiceTable
                 .select { InvoiceTable.status like status.toString() }
+                .limit(take, pageNumber)
                 .map { it.toInvoice() }
         }
     }
