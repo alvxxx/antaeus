@@ -25,13 +25,13 @@ class BillingService(
     private val currentPage = AtomicInteger(-numberOfCoroutines)
     private val logger = LoggerFactory.getLogger(javaClass.simpleName)
 
-    fun handle() = runBlocking {
+    fun chargeInvoices() = runBlocking {
         repeat(numberOfCoroutines) {
-            launch { initProcess() }
+            launch { initChargeProcessor() }
         }
     }
 
-    private suspend fun initProcess() {
+    private suspend fun initChargeProcessor() {
         do {
             val nextPage = currentPage.addAndGet(numberOfCoroutines)
             logger.info("The next page to be fetch is: $nextPage")

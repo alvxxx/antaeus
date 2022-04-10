@@ -65,7 +65,7 @@ class AntaeusRest(
                         post { ctx ->
                             ctx.future(CompletableFuture<Unit>().apply {
                                 Executors.newSingleThreadScheduledExecutor().schedule({
-                                    val executionTime = measureTimeMillis { billingService.handle() }
+                                    val executionTime = measureTimeMillis { billingService.chargeInvoices() }
                                     logger.info("The BillingService execution time was: ${executionTime/1000} s")
                                 }, 1, TimeUnit.SECONDS)
                             })

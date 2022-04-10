@@ -58,7 +58,7 @@ class BillingServiceTest {
         )
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 4 }) } returns listOf()
 
-        sut.handle()
+        sut.chargeInvoices()
 
         verify(exactly = 1) {
             dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0)
@@ -76,7 +76,7 @@ class BillingServiceTest {
         )
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
-        sut.handle()
+        sut.chargeInvoices()
 
         coVerify(exactly = 2) { paymentProvider.charge(any()) }
         confirmVerified(paymentProvider)
@@ -88,7 +88,7 @@ class BillingServiceTest {
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(successInvoice)
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
-        sut.handle()
+        sut.chargeInvoices()
 
         verify { successInvoice.pay() }
     }
@@ -102,7 +102,7 @@ class BillingServiceTest {
         )
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
-        sut.handle()
+        sut.chargeInvoices()
 
         verify(exactly = 1) { dal.updateInvoice(successInvoice) }
     }
@@ -116,7 +116,7 @@ class BillingServiceTest {
         )
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
-        sut.handle()
+        sut.chargeInvoices()
 
         val expectedException = CurrencyMismatchException(1, 1)
         coVerify(exactly = 1) { failureNotificator.notify(withArg <BusinessErrorEvent> {
@@ -138,7 +138,7 @@ class BillingServiceTest {
         )
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
-        sut.handle()
+        sut.chargeInvoices()
 
         val expectedException = CustomerNotFoundException(1)
         coVerify(exactly = 1) { failureNotificator.notify(withArg <BusinessErrorEvent> {
@@ -159,7 +159,7 @@ class BillingServiceTest {
         )
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
-        sut.handle()
+        sut.chargeInvoices()
 
         val expectedException = NetworkException()
         coVerify(exactly = 1) { failureNotificator.notify(withArg <ApplicationErrorEvent> {
@@ -177,7 +177,7 @@ class BillingServiceTest {
         )
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
-        sut.handle()
+        sut.chargeInvoices()
 
         coVerify(exactly = 1) { failureNotificator.notify(withArg <BusinessErrorEvent> {
             assertTrue(it.resourceName == "Invoice")
