@@ -15,10 +15,11 @@ import io.pleo.antaeus.models.InvoiceStatus
 class BillingService(
     private val paymentProvider: PaymentProvider,
     private val dal: AntaeusDal,
-    private val failureNotificator: FailureNotificator
+    private val failureNotificator: FailureNotificator,
+    private val numberOfCoroutines: Int = 16
 ) {
     suspend fun handle() {
-        val invoicesToCharge = dal.fetchInvoicesByStatus(InvoiceStatus.PENDING)
+        val invoicesToCharge = dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0)
         invoicesToCharge.forEach {
             val failureEvent = try { chargeInvoice(it) } catch (ex: Exception) { getFailureEvent(ex, it) }
             if (failureEvent != null) {
