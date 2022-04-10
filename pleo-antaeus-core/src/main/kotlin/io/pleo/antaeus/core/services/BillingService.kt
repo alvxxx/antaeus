@@ -22,17 +22,15 @@ class BillingService(
         var page = 0
         do {
             val invoicesToCharge = dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, page)
-            invoicesToCharge.forEach {
-                val failureEvent = try { chargeInvoice(it) } catch (ex: Exception) { getFailureEvent(ex, it) }
-                if (failureEvent != null) {
-                    failureNotificator.notify(failureEvent)
-                }
+            invoicesToCharge.forEach { invoice ->
+                val failureEvent = try { charge(invoice) } catch (ex: Exception) { getFailureEvent(ex, invoice) }
+                failureEvent?.let { failureNotificator.notify(it) }
             }
             page += numberOfCoroutines
         } while (invoicesToCharge.isNotEmpty())
     }
 
-    private suspend fun chargeInvoice(invoice: Invoice): FailureEvent? {
+    private suspend fun charge(invoice: Invoice): FailureEvent? {
         var event: FailureEvent? = null
         val wasCharged = paymentProvider.charge(invoice)
         if (wasCharged) {
