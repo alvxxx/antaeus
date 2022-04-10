@@ -109,8 +109,9 @@ class BillingServiceTest {
 
     @Test
     fun `will notify invoice failure when occur a mismatch of currencies between customer and invoice`() = runTest {
+        val failInvoice = spyk(mockInvoice(400))
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            mockInvoice(400),
+            failInvoice,
             mockInvoice(200)
         )
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
@@ -124,12 +125,15 @@ class BillingServiceTest {
             assertTrue(it.reason == null)
             assertTrue(it.exception?.message == expectedException.message)
         }) }
+        verify(exactly = 1) { failInvoice.uncollect() }
+        verify(exactly = 1) { dal.updateInvoice(failInvoice) }
     }
 
     @Test
     fun `will notify invoice charge failure when the customer was not found`() = runTest {
+        val failInvoice = spyk(mockInvoice(404))
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            mockInvoice(404),
+            failInvoice,
             mockInvoice(200)
         )
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
@@ -143,6 +147,8 @@ class BillingServiceTest {
             assertTrue(it.reason == null)
             assertTrue(it.exception?.message == expectedException.message)
         }) }
+        verify(exactly = 1) { failInvoice.uncollect() }
+        verify(exactly = 1) { dal.updateInvoice(failInvoice) }
     }
 
     @Test

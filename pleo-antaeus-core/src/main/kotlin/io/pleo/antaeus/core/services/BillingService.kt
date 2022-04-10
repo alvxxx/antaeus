@@ -37,8 +37,9 @@ class BillingService(
             logger.info("The next page to be fetch is: $nextPage")
             val invoicesToCharge = dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, nextPage)
             invoicesToCharge.forEach { invoice ->
-                val failureEvent = try { charge(invoice) } catch (ex: Exception) { getFailureEvent(ex, invoice) }
+                val failureEvent = try { charge(invoice) } catch (ex: Exception) { handleFailure(ex, invoice) }
                 failureEvent?.let { failureNotificator.notify(it) }
+                dal.updateInvoice(invoice)
             }
         } while (invoicesToCharge.isNotEmpty())
     }
@@ -49,7 +50,6 @@ class BillingService(
         if (wasCharged) {
             invoice.pay()
             logger.info("Invoice '${invoice.id}' of customer '${invoice.customerId}' was charged successfully")
-            dal.updateInvoice(invoice)
         } else {
             val reason = "Invoice charge declined due lack of account balance of customer '${invoice.customerId}'"
             event = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, reason)
@@ -57,12 +57,15 @@ class BillingService(
         return event
     }
 
-    private fun getFailureEvent(exception: Exception, invoice: Invoice): FailureEvent? {
+    private fun handleFailure(exception: Exception, invoice: Invoice): FailureEvent? {
         var event: FailureEvent? = null
         when (exception) {
             is CurrencyMismatchException,
             is CustomerNotFoundException
-                -> event = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
+                -> {
+                event = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
+                invoice.uncollect()
+            }
             is NetworkException
                 -> event = ApplicationErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
         }

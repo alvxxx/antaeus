@@ -7,4 +7,8 @@ class Invoice(val id: Int, val customerId: Int, val amount: Money, status: Invoi
     fun pay() {
         status = InvoiceStatus.PAID
     }
+
+    fun uncollect() {
+        status = InvoiceStatus.UNCOLLECTIBLE
+    }
 }
