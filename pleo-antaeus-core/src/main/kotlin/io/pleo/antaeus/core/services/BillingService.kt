@@ -11,23 +11,55 @@ import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.logging.Logger
+import kotlin.math.ceil
+
+private val logger = Logger.getLogger("BillingService")
 
 class BillingService(
     private val paymentProvider: PaymentProvider,
     private val dal: AntaeusDal,
-    private val failureNotificator: FailureNotificator
+    private val failureNotificator: FailureNotificator,
+    private val numberOfCoroutines: Int = 16
 ) {
-    fun handle() {
-        val invoicesToCharge = dal.fetchInvoicesByStatus(InvoiceStatus.PENDING)
-        invoicesToCharge.forEach {
-            val failureEvent = try { chargeInvoice(it) } catch (ex: Exception) { getFailureEvent(ex, it) }
-            if (failureEvent != null) {
-                failureNotificator.notify(failureEvent)
+    private val nextPage = AtomicInteger(-1)
+    private val totalInvoicesToCharge = dal.countInvoicesToCharge(InvoiceStatus.PENDING)
+    private val numberOfPages = ceil(totalInvoicesToCharge/numberOfCoroutines.toDouble()).toInt()
+
+    fun handle() = runBlocking {
+        logger.info("Total invoices is: $totalInvoicesToCharge")
+        logger.info("Total pages is: $numberOfPages")
+        repeat(numberOfCoroutines) { initCoroutine() }
+    }
+
+    private fun CoroutineScope.initCoroutine() {
+        launch(Dispatchers.IO) {
+            while (nextPage.get() < numberOfPages) {
+                val pageNumber = nextPage.incrementAndGet()
+                logger.info("Page to be fetch is: $pageNumber")
+                handleInvoicesOfPage(pageNumber)
             }
         }
     }
 
-    private fun chargeInvoice(invoice: Invoice): FailureEvent? {
+    private suspend fun handleInvoicesOfPage(page: Int) {
+        val invoicesToCharge = dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, numberOfCoroutines * page)
+        invoicesToCharge.forEach { invoice ->
+            val failureEvent = try {
+                charge(invoice)
+            } catch (ex: Exception) {
+                getFailureEvent(ex, invoice)
+            }
+            failureEvent?.let { failureNotificator.notify(it) }
+        }
+    }
+
+    private suspend fun charge(invoice: Invoice): FailureEvent? {
         var event: FailureEvent? = null
         val wasCharged = paymentProvider.charge(invoice)
         if (wasCharged) {

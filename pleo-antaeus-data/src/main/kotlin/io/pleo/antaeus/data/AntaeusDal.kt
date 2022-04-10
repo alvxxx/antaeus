@@ -12,6 +12,7 @@ import io.pleo.antaeus.models.Customer
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import io.pleo.antaeus.models.Money
+import kotlinx.coroutines.delay
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import kotlin.random.Random
@@ -36,18 +37,19 @@ class AntaeusDal(private val db: Database) {
         }
     }
 
-    fun fetchInvoicesByStatus(status: InvoiceStatus): List<Invoice> {
-        Thread.sleep(Random.nextLong(5  * 1000, 2 * 60 * 1000))
+    suspend fun fetchInvoicePageByStatus(status: InvoiceStatus, take: Int, pageNumber: Int): List<Invoice> {
+        delay(Random.nextLong(30, 80))
         return transaction(db) {
             InvoiceTable
                 .select { InvoiceTable.status like status.toString() }
+                .limit(take, pageNumber)
                 .map { it.toInvoice() }
         }
     }
 
-    fun updateInvoice(invoice: Invoice) {
-        Thread.sleep(Random.nextLong(50, 300))
-        transaction(db){
+    suspend fun updateInvoice(invoice: Invoice) {
+        delay(Random.nextLong(30, 80))
+        return transaction(db) {
             InvoiceTable.update({ InvoiceTable.id eq invoice.id }) {
                 it[status] = invoice.status.toString()
                 it[currency] = invoice.amount.currency.toString()
@@ -98,5 +100,13 @@ class AntaeusDal(private val db: Database) {
         }
 
         return fetchCustomer(id)
+    }
+
+    fun countInvoicesToCharge(status: InvoiceStatus): Int {
+        return transaction(db) {
+            InvoiceTable
+                .select { InvoiceTable.status like status.toString() }
+                .count()
+        }
     }
 }

@@ -10,6 +10,8 @@ import io.pleo.antaeus.core.exceptions.EntityNotFoundException
 import io.pleo.antaeus.core.services.BillingService
 import io.pleo.antaeus.core.services.CustomerService
 import io.pleo.antaeus.core.services.InvoiceService
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import kotlin.system.measureTimeMillis
 
@@ -60,11 +62,15 @@ class AntaeusRest(
                     path("billing") {
                         // URL: /rest/v1/billing
                         post {
-                            val executionTime = measureTimeMillis {
-                                billingService.handle()
+                            runBlocking {
+                                launch {
+                                    val executionTime = measureTimeMillis {
+                                        billingService.handle()
+                                    }
+                                    logger.info("The BillingService execution time was: ${executionTime/1000} s")
+                                    it.json("accepted")
+                                }
                             }
-                            logger.info("The BillingService execution time was: ${executionTime/1000} s")
-                            it.json("accepted")
                         }
                     }
 

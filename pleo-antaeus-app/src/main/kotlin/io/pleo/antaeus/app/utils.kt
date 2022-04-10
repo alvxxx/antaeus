@@ -9,6 +9,7 @@ import io.pleo.antaeus.models.Currency
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import io.pleo.antaeus.models.Money
+import kotlinx.coroutines.delay
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
 import kotlin.random.Random
@@ -38,8 +39,8 @@ internal fun setupInitialData(dal: AntaeusDal) {
 // This is the mocked instance of the payment provider
 internal fun getPaymentProvider(): PaymentProvider {
     return object : PaymentProvider {
-        override fun charge(invoice: Invoice): Boolean {
-            Thread.sleep(Random.nextLong(200, 4000))
+        override suspend fun charge(invoice: Invoice): Boolean {
+            delay(Random.nextLong(300, 3000))
             return Random.nextBoolean()
         }
     }
