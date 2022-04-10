@@ -13,18 +13,21 @@ import io.pleo.antaeus.models.Currency
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import io.pleo.antaeus.models.Money
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class BillingServiceTest {
     private val dal = mockk<AntaeusDal>(relaxed = true)
     private val paymentProvider = mockk<PaymentProvider>(relaxed = true) {
-        every { charge(match { it.amount.value == BigDecimal(200) }) } returns true
-        every { charge(match { it.amount.value == BigDecimal(402) }) } returns false
-        every { charge(match { it.amount.value == BigDecimal(404) }) } throws CustomerNotFoundException(1)
-        every { charge(match { it.amount.value == BigDecimal(400) }) } throws CurrencyMismatchException(1, 1)
-        every { charge(match { it.amount.value == BigDecimal(503) }) } throws NetworkException()
+        coEvery { charge(match { it.amount.value == BigDecimal(200) }) } returns true
+        coEvery { charge(match { it.amount.value == BigDecimal(402) }) } returns false
+        coEvery { charge(match { it.amount.value == BigDecimal(404) }) } throws CustomerNotFoundException(1)
+        coEvery { charge(match { it.amount.value == BigDecimal(400) }) } throws CurrencyMismatchException(1, 1)
+        coEvery { charge(match { it.amount.value == BigDecimal(503) }) } throws NetworkException()
     }
     private val failureNotificator = mockk<FailureNotificator>(relaxed = true)
 
@@ -39,7 +42,7 @@ class BillingServiceTest {
     }
 
     @Test
-    fun `will fetch invoices with pending status`() {
+    fun `will fetch invoices with pending status`() = runTest {
         sut.handle()
 
         verify { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) }
@@ -47,7 +50,7 @@ class BillingServiceTest {
     }
 
     @Test
-    fun `will charge each invoice fetched`() {
+    fun `will charge each invoice fetched`() = runTest {
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
             mockInvoice(200),
             mockInvoice(400)
@@ -55,12 +58,12 @@ class BillingServiceTest {
 
         sut.handle()
 
-        verify(exactly = 2) { paymentProvider.charge(any()) }
+        coVerify(exactly = 2) { paymentProvider.charge(any()) }
         confirmVerified(paymentProvider)
     }
 
     @Test
-    fun `will mark invoices as paid when customer charged successfully`() {
+    fun `will mark invoices as paid when customer charged successfully`() = runTest {
         val successInvoice = spyk(mockInvoice(200))
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(successInvoice)
 
@@ -70,7 +73,7 @@ class BillingServiceTest {
     }
 
     @Test
-    fun `will persist invoice status changes on dao`() {
+    fun `will persist invoice status changes on dao`() = runTest {
         val successInvoice = mockInvoice(200)
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
             successInvoice,
@@ -83,7 +86,7 @@ class BillingServiceTest {
     }
 
     @Test
-    fun `will notify invoice failure when occur a mismatch of currencies between customer and invoice`() {
+    fun `will notify invoice failure when occur a mismatch of currencies between customer and invoice`() = runTest {
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
             mockInvoice(400),
             mockInvoice(200)
@@ -101,7 +104,7 @@ class BillingServiceTest {
     }
 
     @Test
-    fun `will notify invoice charge failure when the customer was not found`() {
+    fun `will notify invoice charge failure when the customer was not found`() = runTest {
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
             mockInvoice(404),
             mockInvoice(200)
@@ -119,7 +122,7 @@ class BillingServiceTest {
     }
 
     @Test
-    fun `will notify invoice failure when a network exception occurs`() {
+    fun `will notify invoice failure when a network exception occurs`() = runTest {
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
             mockInvoice(503),
             mockInvoice(200)
@@ -136,7 +139,7 @@ class BillingServiceTest {
     }
 
     @Test
-    fun `will notify invoice charge failure when a invoice charge declined`() {
+    fun `will notify invoice charge failure when a invoice charge declined`() = runTest {
         every { dal.fetchInvoicesByStatus(InvoiceStatus.PENDING) } returns listOf(
             mockInvoice(402),
             mockInvoice(200)
