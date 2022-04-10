@@ -21,24 +21,23 @@ class BillingService(
     private val failureNotificator: FailureNotificator,
     private val numberOfCoroutines: Int = 16
 ) {
-    private val page = AtomicInteger(-numberOfCoroutines)
+    private val currentPage = AtomicInteger(-numberOfCoroutines)
 
-    suspend fun handle() = runBlocking {
+    fun handle() = runBlocking {
         repeat(numberOfCoroutines) {
-            launch {
-                do {
-                    val invoicesToCharge = dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, page.addAndGet(numberOfCoroutines))
-                    invoicesToCharge.forEach { invoice ->
-                        val failureEvent = try {
-                            charge(invoice)
-                        } catch (ex: Exception) {
-                            getFailureEvent(ex, invoice)
-                        }
-                        failureEvent?.let { failureNotificator.notify(it) }
-                    }
-                } while (invoicesToCharge.isNotEmpty())
-            }
+            launch { initProcess() }
         }
+    }
+
+    private suspend fun initProcess() {
+        do {
+            val nextPage = currentPage.addAndGet(numberOfCoroutines)
+            val invoicesToCharge = dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, nextPage)
+            invoicesToCharge.forEach { invoice ->
+                val failureEvent = try { charge(invoice) } catch (ex: Exception) { getFailureEvent(ex, invoice) }
+                failureEvent?.let { failureNotificator.notify(it) }
+            }
+        } while (invoicesToCharge.isNotEmpty())
     }
 
     private suspend fun charge(invoice: Invoice): FailureEvent? {
