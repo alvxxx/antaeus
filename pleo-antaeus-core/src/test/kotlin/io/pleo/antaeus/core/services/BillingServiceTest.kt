@@ -44,11 +44,28 @@ class BillingServiceTest {
     }
 
     @Test
-    fun `will fetch invoices with pending status`() = runTest {
+    fun `will fetch all invoices with pending status`() = runTest {
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
+            mockInvoice(200),
+            mockInvoice(400)
+        )
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 2) } returns listOf(
+            mockInvoice(200),
+            mockInvoice(200)
+        )
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 4) } returns listOf(
+            mockInvoice(402),
+        )
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 6) } returns listOf()
+
         sut.handle()
 
-        verify { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) }
-        confirmVerified(dal)
+        verify {
+            dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0)
+            dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 2)
+            dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 4)
+            dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 6)
+        }
     }
 
     @Test
