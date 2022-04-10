@@ -10,8 +10,10 @@ import io.pleo.antaeus.core.exceptions.EntityNotFoundException
 import io.pleo.antaeus.core.services.BillingService
 import io.pleo.antaeus.core.services.CustomerService
 import io.pleo.antaeus.core.services.InvoiceService
-import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.system.measureTimeMillis
 
 private val logger = LoggerFactory.getLogger("AntaeusRest")
@@ -60,13 +62,15 @@ class AntaeusRest(
                 path("v1") {
                     path("billing") {
                         // URL: /rest/v1/billing
-                        post {
-                            runBlocking {
-                                val executionTime = measureTimeMillis { billingService.handle() }
-                                logger.info("The BillingService execution time was: ${executionTime/1000} s")
-                                it.json("accepted")
-                                it.status(202)
-                            }
+                        post { ctx ->
+                            ctx.future(CompletableFuture<Unit>().apply {
+                                Executors.newSingleThreadScheduledExecutor().schedule({
+                                    val executionTime = measureTimeMillis { billingService.handle() }
+                                    logger.info("The BillingService execution time was: ${executionTime/1000} s")
+                                }, 1, TimeUnit.SECONDS)
+                            })
+                            ctx.json("accepted")
+                            ctx.status(202)
                         }
                     }
 
