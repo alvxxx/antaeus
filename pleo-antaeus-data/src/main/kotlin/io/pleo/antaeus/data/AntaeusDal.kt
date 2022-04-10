@@ -37,7 +37,7 @@ class AntaeusDal(private val db: Database) {
     }
 
     fun fetchInvoicePageByStatus(status: InvoiceStatus, take: Int, pageNumber: Int): List<Invoice> {
-        Thread.sleep(Random.nextLong(5  * 1000, 2 * 60 * 1000))
+        Thread.sleep(Random.nextLong(10, 80))
         return transaction(db) {
             InvoiceTable
                 .select { InvoiceTable.status like status.toString() }
@@ -47,7 +47,7 @@ class AntaeusDal(private val db: Database) {
     }
 
     fun updateInvoice(invoice: Invoice) {
-        Thread.sleep(Random.nextLong(50, 300))
+        Thread.sleep(Random.nextLong(10, 80))
         transaction(db){
             InvoiceTable.update({ InvoiceTable.id eq invoice.id }) {
                 it[status] = invoice.status.toString()

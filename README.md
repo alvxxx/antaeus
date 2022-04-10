@@ -1,10 +1,24 @@
-## Chapter Two: MVP
-In this chapter I will optimize the billing service algorithm, the current process works well and solve the problem, but in at certain quantity of invoices to charge, the process will take too long to charge all records. I also need to test the algorithm in a way near to the reality and now our billing service is mocked and the database is located on the same environment as the application, therefore on production usually we have a remote database that have some latency between read and write operations. With that said, I will mock some delay inside this two services, to emulate this environment. I also will measure the algorithm efficiency during this development, to know that I am going on the right way.
+## Chapter Two: Algorithm optimization
+In this chapter I will optimize the billing service algorithm, the current process works well and solve the problem, but in at certain quantity of invoices to charge, the process will take too long to charge all records. I also need to test the algorithm in a way near to the reality and now our billing service is mocked and the database is located on the same environment as the application, therefore on production usually we have a remote database that has some latency between read and write operations. With that said, I will mock some delay inside this two services, to emulate this environment. I also will measure the algorithm efficiency during this development, to know that I am going on the right way.
 
 ## 9 April 2022 - 5 hours
-I added some threading blocking waits on PaymentProvider and on Dal layer as well to notice the Billing Service degrade with service latencies near to reality. After that, I deepened the knowledge in coroutines in Kotlin and read about the features like Flow, Channels, Suspended functions and SharedMemory to have more tools to solve the problem. I read the Exposed documentation trying to find any feature that could enable to have asynchronous calls on database, but I didn't find a result. So the option that I chose it was to transform the method that get pending invoices in database into a paginated version. With that I was able to dispatch multiple coroutines, each fetching one page to process billing charges. With that I was able to have a huge performance optimization on the billing process, but I created another, ensure that we have strictly one fetch to a page, without that, it will occur invoices being charged multiple times. The solution of this problem it was the usage of AtomicInteger, and done! After did that I decided to put all development in a separate branch called `spike` and I will recreate the algorithm using TDD to have a better understanding of the problem.
+I added some threading blocking waits on PaymentProvider and on Dal layer as well to notice the Billing Service degrade with service latencies near to reality. After that, I deepened the knowledge in coroutines in Kotlin and read about the features like Flow, Channels, Suspended functions and SharedMemory to have more tools to solve the problem. I read the Exposed documentation trying to find any feature that could enable to have asynchronous calls on database, but I didn't find a result. So the option that I chose it was to transform the method that get pending invoices in database into a paginated version. With that I was able to dispatch multiple coroutines, each fetching one page to process billing charges. With that I was able to have a huge performance optimization on the billing process, but I created another issue, ensure that we have strictly one fetch to a page, without that, it will occur invoices being charged multiple times. The solution of this problem it was the usage of AtomicInteger, and done! After did that I decided to put all development in a separate branch called `spike` and I will recreate the algorithm using TDD to have a better understanding of the problem.
+
+## 10 April 2022 - 3 hours
+First, I turned the PaymentProvider interface into a suspended function. After, I refactored the code basis to fetch invoices by pages, then I had to improve the existent production code to fetch all pages. Only after that I could add the coroutines without any problem. In the end I refactored the production code to improve semantic.  
 
 ## Resume of chapter
+After optimize the billing service, I had a significant improvement of performance. It's true that is hard to measure the percent gain, because it's kind of tricky to  emulates the real environment. On the tests with sync, and async code I added some wait locks on PaymentProvider and on AntaeusDal, as described following:
+
+| Classes         |          Sync           |          Async           |
+|-----------------|:-----------------------:|:------------------------:|
+| AntaeusDal      | random from 300ms to 5s | random from 10ms to 80ms |
+| PaymentProvider | random from 300ms to 2s | random from 300ms to 2s  |
+| Execution time  |     round 3 minutes     |        round 30 s        |
+
+On sync execution I emulated a bigger latency on the database as we are fetching all records, and on the second case, the latency is emulated in each page fetched from database.
+
+In the end, I liked the result, but it becomes more technical and harder to understand the invoice business rules. Maybe moving the coroutines' creation to another layer like rest layer, it will get a better design. Therefore, I will not develop this on the challenge.   
 
 ## Developing
 
