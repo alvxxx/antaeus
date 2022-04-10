@@ -13,6 +13,7 @@ import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.slf4j.LoggerFactory
 import java.util.concurrent.atomic.AtomicInteger
 
 class BillingService(
@@ -22,6 +23,7 @@ class BillingService(
     private val numberOfCoroutines: Int = 16
 ) {
     private val currentPage = AtomicInteger(-numberOfCoroutines)
+    private val logger = LoggerFactory.getLogger(javaClass.simpleName)
 
     fun handle() = runBlocking {
         repeat(numberOfCoroutines) {
@@ -32,6 +34,7 @@ class BillingService(
     private suspend fun initProcess() {
         do {
             val nextPage = currentPage.addAndGet(numberOfCoroutines)
+            logger.info("The next page to be fetch is: $nextPage")
             val invoicesToCharge = dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, nextPage)
             invoicesToCharge.forEach { invoice ->
                 val failureEvent = try { charge(invoice) } catch (ex: Exception) { getFailureEvent(ex, invoice) }
@@ -45,6 +48,7 @@ class BillingService(
         val wasCharged = paymentProvider.charge(invoice)
         if (wasCharged) {
             invoice.pay()
+            logger.info("Invoice '${invoice.id}' of customer '${invoice.customerId}' was charged successfully")
             dal.updateInvoice(invoice)
         } else {
             val reason = "Invoice charge declined due lack of account balance of customer '${invoice.customerId}'"
