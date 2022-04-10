@@ -17,7 +17,7 @@ class BillingService(
     private val dal: AntaeusDal,
     private val failureNotificator: FailureNotificator
 ) {
-    fun handle() {
+    suspend fun handle() {
         val invoicesToCharge = dal.fetchInvoicesByStatus(InvoiceStatus.PENDING)
         invoicesToCharge.forEach {
             val failureEvent = try { chargeInvoice(it) } catch (ex: Exception) { getFailureEvent(ex, it) }
@@ -27,7 +27,7 @@ class BillingService(
         }
     }
 
-    private fun chargeInvoice(invoice: Invoice): FailureEvent? {
+    private suspend fun chargeInvoice(invoice: Invoice): FailureEvent? {
         var event: FailureEvent? = null
         val wasCharged = paymentProvider.charge(invoice)
         if (wasCharged) {
