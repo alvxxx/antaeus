@@ -56,11 +56,11 @@ class BillingServiceTest {
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 4) } returns listOf(
             mockInvoice(402),
         )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 6) } returns listOf()
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 4 }) } returns listOf()
 
         sut.handle()
 
-        verify {
+        verify(exactly = 1) {
             dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0)
             dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 2)
             dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 4)
@@ -74,6 +74,7 @@ class BillingServiceTest {
             mockInvoice(200),
             mockInvoice(400)
         )
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
         sut.handle()
 
@@ -85,6 +86,7 @@ class BillingServiceTest {
     fun `will mark invoices as paid when customer charged successfully`() = runTest {
         val successInvoice = spyk(mockInvoice(200))
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(successInvoice)
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
         sut.handle()
 
@@ -98,6 +100,7 @@ class BillingServiceTest {
             successInvoice,
             mockInvoice(402)
         )
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
         sut.handle()
 
@@ -110,6 +113,7 @@ class BillingServiceTest {
             mockInvoice(400),
             mockInvoice(200)
         )
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
         sut.handle()
 
@@ -128,6 +132,7 @@ class BillingServiceTest {
             mockInvoice(404),
             mockInvoice(200)
         )
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
         sut.handle()
 
@@ -146,6 +151,7 @@ class BillingServiceTest {
             mockInvoice(503),
             mockInvoice(200)
         )
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
         sut.handle()
 
@@ -163,6 +169,7 @@ class BillingServiceTest {
             mockInvoice(402),
             mockInvoice(200)
         )
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
         sut.handle()
 

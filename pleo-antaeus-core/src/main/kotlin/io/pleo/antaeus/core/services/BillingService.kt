@@ -11,6 +11,9 @@ import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import java.util.concurrent.atomic.AtomicInteger
 
 class BillingService(
     private val paymentProvider: PaymentProvider,
@@ -18,16 +21,24 @@ class BillingService(
     private val failureNotificator: FailureNotificator,
     private val numberOfCoroutines: Int = 16
 ) {
-    suspend fun handle() {
-        var page = 0
-        do {
-            val invoicesToCharge = dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, page)
-            invoicesToCharge.forEach { invoice ->
-                val failureEvent = try { charge(invoice) } catch (ex: Exception) { getFailureEvent(ex, invoice) }
-                failureEvent?.let { failureNotificator.notify(it) }
+    private val page = AtomicInteger(-numberOfCoroutines)
+
+    suspend fun handle() = runBlocking {
+        repeat(numberOfCoroutines) {
+            launch {
+                do {
+                    val invoicesToCharge = dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, page.addAndGet(numberOfCoroutines))
+                    invoicesToCharge.forEach { invoice ->
+                        val failureEvent = try {
+                            charge(invoice)
+                        } catch (ex: Exception) {
+                            getFailureEvent(ex, invoice)
+                        }
+                        failureEvent?.let { failureNotificator.notify(it) }
+                    }
+                } while (invoicesToCharge.isNotEmpty())
             }
-            page += numberOfCoroutines
-        } while (invoicesToCharge.isNotEmpty())
+        }
     }
 
     private suspend fun charge(invoice: Invoice): FailureEvent? {
