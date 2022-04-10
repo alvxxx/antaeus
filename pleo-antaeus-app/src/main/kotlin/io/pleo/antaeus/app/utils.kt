@@ -50,7 +50,7 @@ internal fun getFailureNotificator(): FailureNotificator {
     return object : FailureNotificator {
         val logger = LoggerFactory.getLogger("FailureNotificator")
 
-        override fun notify(failure: FailureEvent) {
+        override suspend fun notify(failure: FailureEvent) {
             when(failure) {
                 is BusinessErrorEvent -> logger.info("The following failure occurred: ${failure.reason}")
                 is ApplicationErrorEvent -> logger.info("The following failure occurred: ${failure.exception.printStackTrace()}")

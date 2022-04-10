@@ -118,7 +118,7 @@ class BillingServiceTest {
         sut.handle()
 
         val expectedException = CurrencyMismatchException(1, 1)
-        verify(exactly = 1) { failureNotificator.notify(withArg <BusinessErrorEvent> {
+        coVerify(exactly = 1) { failureNotificator.notify(withArg <BusinessErrorEvent> {
             assertTrue(it.resourceName == "Invoice")
             assertTrue(it.resourceId == 1)
             assertTrue(it.reason == null)
@@ -137,7 +137,7 @@ class BillingServiceTest {
         sut.handle()
 
         val expectedException = CustomerNotFoundException(1)
-        verify(exactly = 1) { failureNotificator.notify(withArg <BusinessErrorEvent> {
+        coVerify(exactly = 1) { failureNotificator.notify(withArg <BusinessErrorEvent> {
             assertTrue(it.resourceName == "Invoice")
             assertTrue(it.resourceId == 1)
             assertTrue(it.reason == null)
@@ -156,7 +156,7 @@ class BillingServiceTest {
         sut.handle()
 
         val expectedException = NetworkException()
-        verify(exactly = 1) { failureNotificator.notify(withArg <ApplicationErrorEvent> {
+        coVerify(exactly = 1) { failureNotificator.notify(withArg <ApplicationErrorEvent> {
             assertTrue(it.resourceName == "Invoice")
             assertTrue(it.resourceId == 1)
             assertTrue(it.exception.message == expectedException.message)
@@ -173,7 +173,7 @@ class BillingServiceTest {
 
         sut.handle()
 
-        verify(exactly = 1) { failureNotificator.notify(withArg <BusinessErrorEvent> {
+        coVerify(exactly = 1) { failureNotificator.notify(withArg <BusinessErrorEvent> {
             assertTrue(it.resourceName == "Invoice")
             assertTrue(it.resourceId == 1)
             assertTrue(it.reason == "Invoice charge declined due lack of account balance of customer '1'")
