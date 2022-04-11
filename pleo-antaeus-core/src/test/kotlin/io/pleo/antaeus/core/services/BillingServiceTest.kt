@@ -102,8 +102,7 @@ class BillingServiceTest {
 
     @Test
     fun `will notify invoice changes to paid`() = runTest {
-        val successInvoice = spyk(mockInvoice(200))
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(successInvoice)
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(mockInvoice(200))
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
         sut.chargeInvoices()
@@ -136,11 +135,9 @@ class BillingServiceTest {
 
     @Test
     fun `will notify invoice changes to overdue`() = runTest {
-        val successInvoice1 = spyk(mockInvoice(200))
-        val successInvoice2 = spyk(mockInvoice(200))
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            successInvoice1,
-            successInvoice2
+            mockInvoice(200),
+            mockInvoice(200)
         )
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
