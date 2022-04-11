@@ -83,7 +83,7 @@ class AntaeusRest(
 
                         post("charge/{id}") {
                             val id = it.pathParam("id").toInt()
-                            it.initAsyncProcessor{ billingService.chargeInvoice(id) }
+                            it.initAsyncProcessor{ billingService.chargeInvoiceById(id) }
                         }
 
                         post("overdue") {

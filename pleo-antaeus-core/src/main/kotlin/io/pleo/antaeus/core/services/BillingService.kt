@@ -27,22 +27,17 @@ class BillingService(
     private val logger = LoggerFactory.getLogger(javaClass.simpleName)
 
     fun chargeInvoices() = runBlocking {
-        initPendingInvoiceIterator { charge(it) }
+        initPendingInvoiceIterator { handleCharge(it) }
     }
 
     fun overdueInvoices() = runBlocking {
-        initPendingInvoiceIterator {
-            it.overdue()
-            val eventChange = InvoiceStatusChangedEvent(it.id, it.javaClass.simpleName, InvoiceStatus.PENDING.toString(), InvoiceStatus.OVERDUE.toString())
-            eventNotificator.notify(eventChange)
-            dal.updateInvoice(it)
-        }
+        initPendingInvoiceIterator { handleOverdue(it) }
     }
 
-    fun chargeInvoice(id: Int) = runBlocking {
+    fun chargeInvoiceById(id: Int) = runBlocking {
         try {
             val invoice = fetch(id)
-            charge(invoice)
+            handleCharge(invoice)
         } catch (exception: InvoiceNotFoundException) {
             val failureEvent = BusinessErrorEvent(id, "Invoice", exception = exception)
             eventNotificator.notify(failureEvent)
@@ -67,13 +62,25 @@ class BillingService(
         }
     }
 
-    private suspend fun charge(invoice: Invoice) {
-        val events = try { tryChargeInvoice(invoice) } catch (ex: Exception) { handleFailure(ex, invoice) }
+    private suspend fun handleOverdue(it: Invoice) {
+        it.overdue()
+        val eventChange = InvoiceStatusChangedEvent(
+            it.id,
+            it.javaClass.simpleName,
+            InvoiceStatus.PENDING.toString(),
+            InvoiceStatus.OVERDUE.toString()
+        )
+        eventNotificator.notify(eventChange)
+        dal.updateInvoice(it)
+    }
+
+    private suspend fun handleCharge(invoice: Invoice) {
+        val events = try { tryCharge(invoice) } catch (ex: Exception) { handleFailure(ex, invoice) }
         events.forEach { ev -> eventNotificator.notify(ev) }
         dal.updateInvoice(invoice)
     }
 
-    private suspend fun tryChargeInvoice(invoice: Invoice): List<Event> {
+    private suspend fun tryCharge(invoice: Invoice): List<Event> {
         val events: MutableList<Event> = mutableListOf()
         val wasCharged = paymentProvider.charge(invoice)
         if (wasCharged) {
