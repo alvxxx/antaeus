@@ -12,8 +12,11 @@ import io.pleo.antaeus.models.Customer
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import io.pleo.antaeus.models.Money
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.util.concurrent.atomic.AtomicInteger
 
 class AntaeusDal(private val db: Database) {
     fun fetchInvoice(id: Int): Invoice? {
@@ -24,6 +27,19 @@ class AntaeusDal(private val db: Database) {
                 .select { InvoiceTable.id.eq(id) }
                 .firstOrNull()
                 ?.toInvoice()
+        }
+    }
+
+    suspend fun onEveryPendingInvoice(numberOfCoroutines: Int = 16, action: suspend (Invoice) -> Unit) = runBlocking {
+        val currentPage = AtomicInteger(-numberOfCoroutines)
+        repeat(numberOfCoroutines) {
+            launch {
+                do {
+                    val nextPage = currentPage.addAndGet(numberOfCoroutines)
+                    val invoicesToCharge = fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, nextPage)
+                    invoicesToCharge.forEach { invoice -> action.invoke(invoice) }
+                } while (invoicesToCharge.isNotEmpty())
+            }
         }
     }
 

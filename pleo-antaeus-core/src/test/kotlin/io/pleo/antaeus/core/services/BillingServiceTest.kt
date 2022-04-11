@@ -1,28 +1,24 @@
 package io.pleo.antaeus.core.services
 
 import io.mockk.*
-import io.pleo.antaeus.core.events.ApplicationErrorEvent
-import io.pleo.antaeus.core.events.BusinessErrorEvent
-import io.pleo.antaeus.core.events.InvoiceStatusChangedEvent
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
 import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
+import io.pleo.antaeus.core.exceptions.InvoiceNotFoundException
 import io.pleo.antaeus.core.exceptions.NetworkException
-import io.pleo.antaeus.core.external.EventNotificator
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import io.pleo.antaeus.models.Money
+import io.pleo.antaeus.services.InvoiceDomainService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class BillingServiceTest {
-    private val numberOfCoroutines = 2
     private val dal = mockk<AntaeusDal>(relaxed = true)
     private val paymentProvider = mockk<PaymentProvider>(relaxed = true) {
         coEvery { charge(match { it.amount.value == BigDecimal(200) }) } returns true
@@ -31,234 +27,103 @@ class BillingServiceTest {
         coEvery { charge(match { it.amount.value == BigDecimal(400) }) } throws CurrencyMismatchException(1, 1)
         coEvery { charge(match { it.amount.value == BigDecimal(503) }) } throws NetworkException()
     }
-    private val eventNotificator = mockk<EventNotificator>(relaxed = true)
-
-    private val sut = BillingService(
-        paymentProvider = paymentProvider,
-        dal = dal,
-        eventNotificator = eventNotificator,
-        numberOfCoroutines = numberOfCoroutines
-    )
-
-    private fun mockInvoice(mockedResult: Int, mockedStatus: InvoiceStatus = InvoiceStatus.PENDING): Invoice {
-        return Invoice(1, 1, Money(BigDecimal(mockedResult), Currency.USD), mockedStatus)
+    private val domainService = mockk<InvoiceDomainService>(relaxed = true) {
+        coEvery {  uncollect(invoice = any(), exception = any()) } just Runs
+        coEvery {  fail(id = any(), exception = any()) } just Runs
+    }
+    private val sut = BillingService(paymentProvider, dal, domainService)
+    private fun mockInvoice(mockedResult: Int): Invoice {
+        return Invoice(1, 1, Money(BigDecimal(mockedResult), Currency.USD), InvoiceStatus.PENDING)
     }
 
     @Test
-    fun `will fetch all invoices with pending status`() = runTest {
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            mockInvoice(200),
-            mockInvoice(400)
-        )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 2) } returns listOf(
-            mockInvoice(200),
-            mockInvoice(200)
-        )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 4) } returns listOf(
-            mockInvoice(402),
-        )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 4 }) } returns listOf()
+    fun `will persist update invoice after charge`() = runTest {
+        val invoice = mockInvoice(200)
 
-        sut.chargeInvoices()
+        sut.charge(invoice)
 
-        verify(exactly = 1) {
-            dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0)
-            dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 2)
-            dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 4)
-            dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 6)
-        }
+        verify(exactly = 1) { dal.updateInvoice(invoice) }
     }
 
     @Test
-    fun `will charge each invoice fetched`() = runTest {
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            mockInvoice(200),
-            mockInvoice(400)
-        )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+    fun `will persist update invoice after overdue`() = runTest {
+        val invoice = mockInvoice(200)
 
-        sut.chargeInvoices()
+        sut.overdue(invoice)
 
-        coVerify(exactly = 2) { paymentProvider.charge(any()) }
-        confirmVerified(paymentProvider)
+        verify(exactly = 1) { dal.updateInvoice(invoice) }
     }
 
     @Test
-    fun `will mark invoices as paid when customer charged successfully`() = runTest {
-        val successInvoice = spyk(mockInvoice(200))
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(successInvoice)
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+    fun `will pay invoice if it was charged successfully`() = runTest {
+        val invoice = mockInvoice(200)
 
-        sut.chargeInvoices()
+        sut.charge(invoice)
 
-        verify { successInvoice.pay() }
-        coVerify(exactly = 1) { eventNotificator.notify(withArg <InvoiceStatusChangedEvent> {
-            assertTrue(it.resourceName == "Invoice")
-            assertTrue(it.resourceId == 1)
-            assertTrue(it.oldStatus == "PENDING")
-            assertTrue(it.newStatus == "PAID")
-        }) }
+        coVerify(exactly = 1) { domainService.pay(invoice) }
     }
 
     @Test
-    fun `will notify invoice changes to paid`() = runTest {
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(mockInvoice(200))
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+    fun `will overdue invoice successfully`() = runTest {
+        val invoice = mockInvoice(200)
 
-        sut.chargeInvoices()
+        sut.overdue(invoice)
 
-        coVerify(exactly = 1) { eventNotificator.notify(withArg <InvoiceStatusChangedEvent> {
-            assertTrue(it.resourceName == "Invoice")
-            assertTrue(it.resourceId == 1)
-            assertTrue(it.oldStatus == "PENDING")
-            assertTrue(it.newStatus == "PAID")
-        }) }
+        coVerify(exactly = 1) { domainService.overdue(invoice) }
     }
 
     @Test
-    fun `will mark invoices as overdue successfully`() = runTest {
-        val successInvoice1 = spyk(mockInvoice(200))
-        val successInvoice2 = spyk(mockInvoice(200))
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            successInvoice1,
-            successInvoice2
-        )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+    fun `will decline invoice if it was not charged`() = runTest {
+        val invoice = mockInvoice(402)
 
-        sut.overdueInvoices()
+        sut.charge(invoice)
 
-        verify {
-            successInvoice1.overdue()
-            successInvoice2.overdue()
-        }
+        coVerify(exactly = 1) { domainService.decline(invoice) }
     }
 
     @Test
-    fun `will notify invoice changes to overdue`() = runTest {
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            mockInvoice(200),
-            mockInvoice(200)
-        )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+    fun `will uncollect invoice if the customer was not found`() = runTest {
+        val invoice = mockInvoice(404)
 
-        sut.overdueInvoices()
+        sut.charge(invoice)
 
-        coVerify(exactly = 2) { eventNotificator.notify(withArg <InvoiceStatusChangedEvent> {
-            assertTrue(it.resourceName == "Invoice")
-            assertTrue(it.resourceId == 1)
-            assertTrue(it.oldStatus == "PENDING")
-            assertTrue(it.newStatus == "OVERDUE")
-        }) }
+        coVerify(exactly = 1) { domainService.uncollect(invoice, ofType<CustomerNotFoundException>()) }
     }
 
     @Test
-    fun `will persist invoice status changes on dao`() = runTest {
-        val successInvoice = mockInvoice(200)
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            successInvoice,
-            mockInvoice(402)
-        )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+    fun `will uncollect if the invoice currency not matches with customer currency`() = runTest {
+        val invoice = mockInvoice(400)
 
-        sut.chargeInvoices()
+        sut.charge(invoice)
 
-        verify(exactly = 1) { dal.updateInvoice(successInvoice) }
+        coVerify(exactly = 1) { domainService.uncollect(invoice, ofType<CurrencyMismatchException>()) }
     }
 
     @Test
-    fun `will notify invoice failure when occur a mismatch of currencies between customer and invoice`() = runTest {
-        val failInvoice = spyk(mockInvoice(400))
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            failInvoice,
-            mockInvoice(200)
-        )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+    fun `will fail invoice charge if a network exception occurs`() = runTest {
+        val invoice = mockInvoice(503)
 
-        sut.chargeInvoices()
+        sut.charge(invoice)
 
-        val expectedException = CurrencyMismatchException(1, 1)
-        coVerify(exactly = 1) { eventNotificator.notify(withArg <BusinessErrorEvent> {
-            assertTrue(it.resourceName == "Invoice")
-            assertTrue(it.resourceId == 1)
-            assertTrue(it.reason == null)
-            assertTrue(it.exception?.message == expectedException.message)
-        }) }
-        verify(exactly = 1) { failInvoice.uncollect() }
-        verify(exactly = 1) { dal.updateInvoice(failInvoice) }
+        coVerify(exactly = 1) { domainService.fail(invoice.id, ofType<NetworkException>()) }
     }
 
     @Test
-    fun `will notify invoice charge failure when the customer was not found`() = runTest {
-        val failInvoice = spyk(mockInvoice(404))
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            failInvoice,
-            mockInvoice(200)
-        )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+    fun `will charge invoice if invoice exists`() = runTest {
+        val invoice = mockInvoice(200)
+        every { dal.fetchInvoice(1) } returns invoice
 
-        sut.chargeInvoices()
+        sut.chargeInvoiceById(1)
 
-        val expectedException = CustomerNotFoundException(1)
-        coVerify(exactly = 1) { eventNotificator.notify(withArg <BusinessErrorEvent> {
-            assertTrue(it.resourceName == "Invoice")
-            assertTrue(it.resourceId == 1)
-            assertTrue(it.reason == null)
-            assertTrue(it.exception?.message == expectedException.message)
-        }) }
-        verify(exactly = 1) { failInvoice.uncollect() }
-        verify(exactly = 1) { dal.updateInvoice(failInvoice) }
+        coVerify(exactly = 1) { sut.charge(invoice) }
     }
 
     @Test
-    fun `will notify invoice failure when a network exception occurs`() = runTest {
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            mockInvoice(503),
-            mockInvoice(200)
-        )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+    fun `will fail invoice if invoice not exists`() = runTest {
+        coEvery { dal.fetchInvoice(1) } returns null
 
-        sut.chargeInvoices()
+        sut.chargeInvoiceById(1)
 
-        val expectedException = NetworkException()
-        coVerify(exactly = 1) { eventNotificator.notify(withArg <ApplicationErrorEvent> {
-            assertTrue(it.resourceName == "Invoice")
-            assertTrue(it.resourceId == 1)
-            assertTrue(it.exception.message == expectedException.message)
-        }) }
-    }
-
-    @Test
-    fun `will notify invoice charge failure when a invoice charge declined`() = runTest {
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            mockInvoice(402),
-            mockInvoice(200)
-        )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
-
-        sut.chargeInvoices()
-
-        coVerify(exactly = 1) { eventNotificator.notify(withArg <BusinessErrorEvent> {
-            assertTrue(it.resourceName == "Invoice")
-            assertTrue(it.resourceId == 1)
-            assertTrue(it.reason == "Invoice charge declined due lack of account balance of customer '1'")
-        }) }
-    }
-
-    @Test
-    fun `will notify invoice changes to uncollect`() = runTest {
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
-            mockInvoice(400),
-            mockInvoice(404)
-        )
-        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
-
-        sut.chargeInvoices()
-
-        coVerify(exactly = 2) { eventNotificator.notify(withArg <InvoiceStatusChangedEvent> {
-            assertTrue(it.resourceName == "Invoice")
-            assertTrue(it.resourceId == 1)
-            assertTrue(it.oldStatus == "PENDING")
-            assertTrue(it.newStatus == "UNCOLLECTIBLE")
-        }) }
+        coVerify(exactly = 1) { domainService.fail(1, ofType<InvoiceNotFoundException>()) }
     }
 }

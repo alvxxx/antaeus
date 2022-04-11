@@ -16,6 +16,7 @@ import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.data.CustomerTable
 import io.pleo.antaeus.data.InvoiceTable
 import io.pleo.antaeus.rest.AntaeusRest
+import io.pleo.antaeus.services.InvoiceDomainService
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.StdOutSqlLogger
@@ -59,9 +60,14 @@ fun main() {
     val eventNotificator = getEventNotificator()
 
     // Create core services
+    val domainService = InvoiceDomainService(eventNotificator)
     val invoiceService = InvoiceService(dal = dal)
     val customerService = CustomerService(dal = dal)
-    val billingService = BillingService(paymentProvider = paymentProvider, dal = dal, eventNotificator = eventNotificator)
+    val billingService = BillingService(
+        paymentProvider = paymentProvider,
+        dal = dal,
+        domainService = domainService
+    )
 
     // Create REST web service
     AntaeusRest(

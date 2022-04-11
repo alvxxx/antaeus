@@ -1,121 +1,51 @@
 package io.pleo.antaeus.core.services
 
-import io.pleo.antaeus.core.events.ApplicationErrorEvent
-import io.pleo.antaeus.core.events.BusinessErrorEvent
-import io.pleo.antaeus.core.events.Event
-import io.pleo.antaeus.core.events.InvoiceStatusChangedEvent
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
 import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
 import io.pleo.antaeus.core.exceptions.InvoiceNotFoundException
 import io.pleo.antaeus.core.exceptions.NetworkException
-import io.pleo.antaeus.core.external.EventNotificator
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Invoice
-import io.pleo.antaeus.models.InvoiceStatus
-import kotlinx.coroutines.launch
+import io.pleo.antaeus.services.InvoiceDomainService
 import kotlinx.coroutines.runBlocking
-import org.slf4j.LoggerFactory
-import java.util.concurrent.atomic.AtomicInteger
 
 class BillingService(
     private val paymentProvider: PaymentProvider,
     private val dal: AntaeusDal,
-    private val eventNotificator: EventNotificator,
-    private val numberOfCoroutines: Int = 16
+    private val domainService: InvoiceDomainService
 ) {
-    private val logger = LoggerFactory.getLogger(javaClass.simpleName)
-
     fun chargeInvoices() = runBlocking {
-        initPendingInvoiceIterator { handleCharge(it) }
+        dal.onEveryPendingInvoice { charge(it) }
     }
 
     fun overdueInvoices() = runBlocking {
-        initPendingInvoiceIterator { handleOverdue(it) }
+        dal.onEveryPendingInvoice { overdue(it) }
     }
 
     fun chargeInvoiceById(id: Int) = runBlocking {
-        try {
-            val invoice = fetch(id)
-            handleCharge(invoice)
-        } catch (exception: InvoiceNotFoundException) {
-            val failureEvent = BusinessErrorEvent(id, "Invoice", exception = exception)
-            eventNotificator.notify(failureEvent)
+        when(val it =  dal.fetchInvoice(id)?: InvoiceNotFoundException(id)) {
+            is Invoice -> charge(it)
+            is InvoiceNotFoundException -> domainService.fail(id, it)
         }
     }
 
-    private fun fetch(id: Int): Invoice {
-        return dal.fetchInvoice(id) ?: throw InvoiceNotFoundException(id)
-    }
-
-    private suspend fun initPendingInvoiceIterator(action: suspend (Invoice) -> Unit) = runBlocking {
-        val currentPage = AtomicInteger(-numberOfCoroutines)
-        repeat(numberOfCoroutines) {
-            launch {
-                do {
-                    val nextPage = currentPage.addAndGet(numberOfCoroutines)
-                    logger.info("The next page to be fetch is: ${nextPage / numberOfCoroutines}")
-                    val invoicesToCharge = dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, nextPage)
-                    invoicesToCharge.forEach { invoice -> action.invoke(invoice) }
-                } while (invoicesToCharge.isNotEmpty())
-            }
-        }
-    }
-
-    private suspend fun handleOverdue(it: Invoice) {
-        it.overdue()
-        val eventChange = InvoiceStatusChangedEvent(
-            it.id,
-            it.javaClass.simpleName,
-            InvoiceStatus.PENDING.toString(),
-            InvoiceStatus.OVERDUE.toString()
-        )
-        eventNotificator.notify(eventChange)
+    internal suspend fun overdue(it: Invoice) {
+        domainService.overdue(it)
         dal.updateInvoice(it)
     }
 
-    private suspend fun handleCharge(invoice: Invoice) {
-        val events = try { tryCharge(invoice) } catch (ex: Exception) { handleFailure(ex, invoice) }
-        events.forEach { ev -> eventNotificator.notify(ev) }
-        dal.updateInvoice(invoice)
-    }
-
-    private suspend fun tryCharge(invoice: Invoice): List<Event> {
-        val events: MutableList<Event> = mutableListOf()
-        val wasCharged = paymentProvider.charge(invoice)
-        if (wasCharged) {
-            invoice.pay()
-            val eventChange = InvoiceStatusChangedEvent(
-                invoice.id,
-                invoice.javaClass.simpleName,
-                InvoiceStatus.PENDING.toString(),
-                InvoiceStatus.PAID.toString()
-            )
-            events.add(eventChange)
-        } else {
-            val reason = "Invoice charge declined due lack of account balance of customer '${invoice.customerId}'"
-            val eventFailure = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, reason)
-            events.add(eventFailure)
-        }
-        return events
-    }
-
-    private fun handleFailure(exception: Exception, invoice: Invoice): List<Event> {
-        val events: MutableList<Event> = mutableListOf()
-        when (exception) {
-            is CurrencyMismatchException,
-            is CustomerNotFoundException -> {
-                invoice.uncollect()
-                val failureEvent = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
-                val eventChange = InvoiceStatusChangedEvent(invoice.id, invoice.javaClass.simpleName, InvoiceStatus.PENDING.toString(), InvoiceStatus.UNCOLLECTIBLE.toString())
-                events.add(failureEvent)
-                events.add(eventChange)
-            }
-            is NetworkException -> {
-                val failureEvent = ApplicationErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
-                events.add(failureEvent)
+    internal suspend fun charge(it: Invoice) {
+        try {
+            val wasCharged = paymentProvider.charge(it)
+            if (wasCharged) domainService.pay(it) else domainService.decline(it)
+        } catch (ex: Exception) {
+            when (ex) {
+                is CurrencyMismatchException,
+                is CustomerNotFoundException -> domainService.uncollect(it, ex)
+                is NetworkException -> domainService.fail(it.id, ex)
             }
         }
-        return events
+        dal.updateInvoice(it)
     }
 }

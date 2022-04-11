@@ -1,9 +1,9 @@
 
-import io.pleo.antaeus.core.events.ApplicationErrorEvent
-import io.pleo.antaeus.core.events.BusinessErrorEvent
-import io.pleo.antaeus.core.events.Event
-import io.pleo.antaeus.core.events.InvoiceStatusChangedEvent
-import io.pleo.antaeus.core.external.EventNotificator
+import io.pleo.antaeus.events.ApplicationErrorEvent
+import io.pleo.antaeus.events.BusinessErrorEvent
+import io.pleo.antaeus.events.Event
+import io.pleo.antaeus.events.InvoiceStatusChangedEvent
+import io.pleo.antaeus.external.EventNotificator
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency

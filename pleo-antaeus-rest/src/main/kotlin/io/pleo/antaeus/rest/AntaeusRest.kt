@@ -53,7 +53,7 @@ class AntaeusRest(
                 .newSingleThreadScheduledExecutor()
                 .schedule({
                     val executionTime = measureTimeMillis { action.run() }
-                    logger.info("The charge service execution time was: ${executionTime/1000} s")
+                    logger.info("The service time execution was: ${executionTime/1000} s")
                 }, 1, TimeUnit.SECONDS)
         })
         this.json("Accepted")
@@ -77,18 +77,14 @@ class AntaeusRest(
                 path("v1") {
                     path("billing") {
                         // URL: /rest/v1/billing
-                        post("charge") {
-                            it.initAsyncProcessor { billingService.chargeInvoices() }
-                        }
+                        post("charge") { it.initAsyncProcessor { billingService.chargeInvoices() }}
 
                         post("charge/{id}") {
                             val id = it.pathParam("id").toInt()
                             it.initAsyncProcessor{ billingService.chargeInvoiceById(id) }
                         }
 
-                        post("overdue") {
-                            it.initAsyncProcessor { billingService.overdueInvoices() }
-                        }
+                        post("overdue") { it.initAsyncProcessor { billingService.overdueInvoices() } }
                     }
 
                     path("invoices") {

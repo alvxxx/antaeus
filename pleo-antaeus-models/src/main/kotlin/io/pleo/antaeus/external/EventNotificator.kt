@@ -1,6 +1,6 @@
-package io.pleo.antaeus.core.external
+package io.pleo.antaeus.external
 
-import io.pleo.antaeus.core.events.Event
+import io.pleo.antaeus.events.Event
 
 interface EventNotificator {
     /*
