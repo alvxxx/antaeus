@@ -36,6 +36,8 @@ class BillingService(
     fun markPendingInvoicesAsOverdue() = runBlocking {
         initPendingInvoiceIterator {
             it.overdue()
+            val eventChange = InvoiceStatusChangedEvent(it.id, it.javaClass.simpleName, InvoiceStatus.PENDING.toString(), InvoiceStatus.OVERDUE.toString())
+            eventNotificator.notify(eventChange)
             dal.updateInvoice(it)
         }
     }

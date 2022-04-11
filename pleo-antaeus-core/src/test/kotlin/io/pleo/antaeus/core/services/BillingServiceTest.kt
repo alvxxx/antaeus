@@ -101,6 +101,44 @@ class BillingServiceTest {
     }
 
     @Test
+    fun `will mark invoices as overdue successfully`() = runTest {
+        val successInvoice1 = spyk(mockInvoice(200))
+        val successInvoice2 = spyk(mockInvoice(200))
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
+            successInvoice1,
+            successInvoice2
+        )
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+
+        sut.markPendingInvoicesAsOverdue()
+
+        verify {
+            successInvoice1.overdue()
+            successInvoice2.overdue()
+        }
+    }
+
+    @Test
+    fun `will notify invoice changes to overdue`() = runTest {
+        val successInvoice1 = spyk(mockInvoice(200))
+        val successInvoice2 = spyk(mockInvoice(200))
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
+            successInvoice1,
+            successInvoice2
+        )
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+
+        sut.markPendingInvoicesAsOverdue()
+
+        coVerify(exactly = 2) { eventNotificator.notify(withArg <InvoiceStatusChangedEvent> {
+            assertTrue(it.resourceName == "Invoice")
+            assertTrue(it.resourceId == 1)
+            assertTrue(it.oldStatus == "PENDING")
+            assertTrue(it.newStatus == "OVERDUE")
+        }) }
+    }
+
+    @Test
     fun `will persist invoice status changes on dao`() = runTest {
         val successInvoice = mockInvoice(200)
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
