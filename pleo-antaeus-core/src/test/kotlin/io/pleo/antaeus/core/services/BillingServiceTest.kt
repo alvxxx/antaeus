@@ -101,6 +101,22 @@ class BillingServiceTest {
     }
 
     @Test
+    fun `will notify invoice changes to paid`() = runTest {
+        val successInvoice = spyk(mockInvoice(200))
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(successInvoice)
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+
+        sut.chargeInvoices()
+
+        coVerify(exactly = 1) { eventNotificator.notify(withArg <InvoiceStatusChangedEvent> {
+            assertTrue(it.resourceName == "Invoice")
+            assertTrue(it.resourceId == 1)
+            assertTrue(it.oldStatus == "PENDING")
+            assertTrue(it.newStatus == "PAID")
+        }) }
+    }
+
+    @Test
     fun `will mark invoices as overdue successfully`() = runTest {
         val successInvoice1 = spyk(mockInvoice(200))
         val successInvoice2 = spyk(mockInvoice(200))
