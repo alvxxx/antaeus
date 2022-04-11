@@ -24,7 +24,7 @@ class BillingService(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass.simpleName)
 
-    suspend fun chargeInvoices() {
+    fun chargeInvoices() = runBlocking {
         initPendingInvoiceIterator {
             val failureEvent = try { charge(it) } catch (ex: Exception) { handleFailure(ex, it) }
             failureEvent?.let { ev -> failureNotificator.notify(ev) }
@@ -32,7 +32,7 @@ class BillingService(
         }
     }
 
-    suspend fun markPendingInvoicesAsOverdue() {
+    fun markPendingInvoicesAsOverdue() = runBlocking {
         initPendingInvoiceIterator {
             it.overdue()
             dal.updateInvoice(it)
