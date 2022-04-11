@@ -14,7 +14,6 @@ import io.pleo.antaeus.models.InvoiceStatus
 import io.pleo.antaeus.models.Money
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
-import kotlin.random.Random
 
 class AntaeusDal(private val db: Database) {
     fun fetchInvoice(id: Int): Invoice? {
@@ -37,7 +36,6 @@ class AntaeusDal(private val db: Database) {
     }
 
     fun fetchInvoicePageByStatus(status: InvoiceStatus, take: Int, pageNumber: Int): List<Invoice> {
-        Thread.sleep(Random.nextLong(10, 80))
         return transaction(db) {
             InvoiceTable
                 .select { InvoiceTable.status like status.toString() }
@@ -46,8 +44,15 @@ class AntaeusDal(private val db: Database) {
         }
     }
 
+    fun updatePendingInvoicesAs(newStatus: InvoiceStatus) {
+        transaction(db){
+            InvoiceTable.update({ InvoiceTable.status eq InvoiceStatus.PENDING.toString() }) {
+                it[status] = newStatus.toString()
+            }
+        }
+    }
+
     fun updateInvoice(invoice: Invoice) {
-        Thread.sleep(Random.nextLong(10, 80))
         transaction(db){
             InvoiceTable.update({ InvoiceTable.id eq invoice.id }) {
                 it[status] = invoice.status.toString()

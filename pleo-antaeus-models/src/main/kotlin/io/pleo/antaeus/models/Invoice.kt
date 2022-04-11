@@ -11,4 +11,8 @@ class Invoice(val id: Int, val customerId: Int, val amount: Money, status: Invoi
     fun uncollect() {
         status = InvoiceStatus.UNCOLLECTIBLE
     }
+
+    fun overdue() {
+        status = InvoiceStatus.OVERDUE
+    }
 }

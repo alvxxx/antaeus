@@ -6,6 +6,7 @@ package io.pleo.antaeus.rest
 
 import io.javalin.Javalin
 import io.javalin.apibuilder.ApiBuilder.*
+import io.javalin.http.Context
 import io.pleo.antaeus.core.exceptions.EntityNotFoundException
 import io.pleo.antaeus.core.services.BillingService
 import io.pleo.antaeus.core.services.CustomerService
@@ -45,6 +46,19 @@ class AntaeusRest(
             error(404) { ctx -> ctx.json("not found") }
         }
 
+    private fun Context.initAsyncProcessor(action: Runnable) {
+        this.future(CompletableFuture<Unit>().apply {
+            Executors
+                .newSingleThreadScheduledExecutor()
+                .schedule({
+                    val executionTime = measureTimeMillis { action.run() }
+                    logger.info("The charge service execution time was: ${executionTime/1000} s")
+                }, 1, TimeUnit.SECONDS)
+        })
+        this.json("Accepted")
+        this.status(202)
+    }
+
     init {
         // Set up URL endpoints for the rest app
         app.routes {
@@ -62,15 +76,12 @@ class AntaeusRest(
                 path("v1") {
                     path("billing") {
                         // URL: /rest/v1/billing
-                        post { ctx ->
-                            ctx.future(CompletableFuture<Unit>().apply {
-                                Executors.newSingleThreadScheduledExecutor().schedule({
-                                    val executionTime = measureTimeMillis { billingService.chargeInvoices() }
-                                    logger.info("The BillingService execution time was: ${executionTime/1000} s")
-                                }, 1, TimeUnit.SECONDS)
-                            })
-                            ctx.json("accepted")
-                            ctx.status(202)
+                        post("charge") {
+                            it.initAsyncProcessor { billingService.chargeInvoices() }
+                        }
+
+                        post("overdue") {
+                            it.initAsyncProcessor { billingService.markPendingInvoicesAsOverdue() }
                         }
                     }
 

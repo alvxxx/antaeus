@@ -22,26 +22,35 @@ class BillingService(
     private val failureNotificator: FailureNotificator,
     private val numberOfCoroutines: Int = 16
 ) {
-    private val currentPage = AtomicInteger(-numberOfCoroutines)
     private val logger = LoggerFactory.getLogger(javaClass.simpleName)
 
-    fun chargeInvoices() = runBlocking {
-        repeat(numberOfCoroutines) {
-            launch { initChargeProcessor() }
+    suspend fun chargeInvoices() {
+        initPendingInvoiceIterator {
+            val failureEvent = try { charge(it) } catch (ex: Exception) { handleFailure(ex, it) }
+            failureEvent?.let { ev -> failureNotificator.notify(ev) }
+            dal.updateInvoice(it)
         }
     }
 
-    private suspend fun initChargeProcessor() {
-        do {
-            val nextPage = currentPage.addAndGet(numberOfCoroutines)
-            logger.info("The next page to be fetch is: $nextPage")
-            val invoicesToCharge = dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, nextPage)
-            invoicesToCharge.forEach { invoice ->
-                val failureEvent = try { charge(invoice) } catch (ex: Exception) { handleFailure(ex, invoice) }
-                failureEvent?.let { failureNotificator.notify(it) }
-                dal.updateInvoice(invoice)
+    suspend fun markPendingInvoicesAsOverdue() {
+        initPendingInvoiceIterator {
+            it.overdue()
+            dal.updateInvoice(it)
+        }
+    }
+
+    private suspend fun initPendingInvoiceIterator(action: suspend (Invoice) -> Unit) = runBlocking {
+        val currentPage = AtomicInteger(-numberOfCoroutines)
+        repeat(numberOfCoroutines) {
+            launch {
+                do {
+                    val nextPage = currentPage.addAndGet(numberOfCoroutines)
+                    logger.info("The next page to be fetch is: ${nextPage / numberOfCoroutines}")
+                    val invoicesToCharge = dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, nextPage)
+                    invoicesToCharge.forEach { invoice -> action.invoke(invoice) }
+                } while (invoicesToCharge.isNotEmpty())
             }
-        } while (invoicesToCharge.isNotEmpty())
+        }
     }
 
     private suspend fun charge(invoice: Invoice): FailureEvent? {
