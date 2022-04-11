@@ -48,6 +48,12 @@ internal fun getPaymentProvider(): PaymentProvider {
 }
 
 internal fun getEventNotificator(): EventNotificator {
+    /*
+       This is a mocked implementation of an event notificator, on production environment this handle could dispatch
+       events to a topic and any interest part could retrieve information about the invoice.
+       It is possible to implement this using localstack as well, therefore I will not implement on the challenge.
+    */
+
     return object : EventNotificator {
         val logger = LoggerFactory.getLogger("EventNotificator")
 
