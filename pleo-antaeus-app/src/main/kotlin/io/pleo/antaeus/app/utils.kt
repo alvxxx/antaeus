@@ -2,6 +2,7 @@
 import io.pleo.antaeus.core.events.ApplicationErrorEvent
 import io.pleo.antaeus.core.events.BusinessErrorEvent
 import io.pleo.antaeus.core.events.Event
+import io.pleo.antaeus.core.events.InvoiceStatusChangedEvent
 import io.pleo.antaeus.core.external.EventNotificator
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
@@ -52,6 +53,7 @@ internal fun getEventNotificator(): EventNotificator {
 
         override suspend fun notify(event: Event) {
             when(event) {
+                is InvoiceStatusChangedEvent -> logger.info("Invoice '${event.resourceId}' had a status change. was: ${event.oldStatus}, now: ${event.newStatus}")
                 is BusinessErrorEvent -> logger.info("The following failure occurred: ${event.reason}")
                 is ApplicationErrorEvent -> logger.info("The following failure occurred: ${event.exception.printStackTrace()}")
             }

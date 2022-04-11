@@ -3,6 +3,7 @@ package io.pleo.antaeus.core.services
 import io.pleo.antaeus.core.events.ApplicationErrorEvent
 import io.pleo.antaeus.core.events.BusinessErrorEvent
 import io.pleo.antaeus.core.events.Event
+import io.pleo.antaeus.core.events.InvoiceStatusChangedEvent
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
 import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
 import io.pleo.antaeus.core.exceptions.NetworkException
@@ -58,7 +59,8 @@ class BillingService(
         val wasCharged = paymentProvider.charge(invoice)
         if (wasCharged) {
             invoice.pay()
-            logger.info("Invoice '${invoice.id}' of customer '${invoice.customerId}' was charged successfully")
+            val eventChange = InvoiceStatusChangedEvent(invoice.id, invoice.javaClass.simpleName, InvoiceStatus.PENDING.toString(), InvoiceStatus.PAID.toString())
+            eventNotificator.notify(eventChange)
         } else {
             val reason = "Invoice charge declined due lack of account balance of customer '${invoice.customerId}'"
             event = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, reason)

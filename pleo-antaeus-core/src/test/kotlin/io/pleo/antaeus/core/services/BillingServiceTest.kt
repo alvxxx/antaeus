@@ -3,6 +3,7 @@ package io.pleo.antaeus.core.services
 import io.mockk.*
 import io.pleo.antaeus.core.events.ApplicationErrorEvent
 import io.pleo.antaeus.core.events.BusinessErrorEvent
+import io.pleo.antaeus.core.events.InvoiceStatusChangedEvent
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
 import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
 import io.pleo.antaeus.core.exceptions.NetworkException
@@ -91,6 +92,12 @@ class BillingServiceTest {
         sut.chargeInvoices()
 
         verify { successInvoice.pay() }
+        coVerify(exactly = 1) { eventNotificator.notify(withArg <InvoiceStatusChangedEvent> {
+            assertTrue(it.resourceName == "Invoice")
+            assertTrue(it.resourceId == 1)
+            assertTrue(it.oldStatus == "PENDING")
+            assertTrue(it.newStatus == "PAID")
+        }) }
     }
 
     @Test
