@@ -11,6 +11,7 @@ import io.pleo.antaeus.core.exceptions.EntityNotFoundException
 import io.pleo.antaeus.core.services.BillingService
 import io.pleo.antaeus.core.services.CustomerService
 import io.pleo.antaeus.core.services.InvoiceService
+import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
@@ -78,6 +79,11 @@ class AntaeusRest(
                         // URL: /rest/v1/billing
                         post("charge") {
                             it.initAsyncProcessor { billingService.chargeInvoices() }
+                        }
+
+                        post("charge/{id}") {
+                            val id = it.pathParam("id").toInt()
+                            it.initAsyncProcessor{ billingService.chargeInvoice(id) }
                         }
 
                         post("overdue") {

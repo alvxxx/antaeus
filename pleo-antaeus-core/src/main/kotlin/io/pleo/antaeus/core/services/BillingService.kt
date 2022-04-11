@@ -6,6 +6,7 @@ import io.pleo.antaeus.core.events.Event
 import io.pleo.antaeus.core.events.InvoiceStatusChangedEvent
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
 import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
+import io.pleo.antaeus.core.exceptions.InvoiceNotFoundException
 import io.pleo.antaeus.core.exceptions.NetworkException
 import io.pleo.antaeus.core.external.EventNotificator
 import io.pleo.antaeus.core.external.PaymentProvider
@@ -26,11 +27,7 @@ class BillingService(
     private val logger = LoggerFactory.getLogger(javaClass.simpleName)
 
     fun chargeInvoices() = runBlocking {
-        initPendingInvoiceIterator {
-            val events = try { charge(it) } catch (ex: Exception) { handleFailure(ex, it) }
-            events.forEach { ev -> eventNotificator.notify(ev) }
-            dal.updateInvoice(it)
-        }
+        initPendingInvoiceIterator { charge(it) }
     }
 
     fun overdueInvoices() = runBlocking {
@@ -40,6 +37,20 @@ class BillingService(
             eventNotificator.notify(eventChange)
             dal.updateInvoice(it)
         }
+    }
+
+    fun chargeInvoice(id: Int) = runBlocking {
+        try {
+            val invoice = fetch(id)
+            charge(invoice)
+        } catch (exception: InvoiceNotFoundException) {
+            val failureEvent = BusinessErrorEvent(id, "Invoice", exception = exception)
+            eventNotificator.notify(failureEvent)
+        }
+    }
+
+    private fun fetch(id: Int): Invoice {
+        return dal.fetchInvoice(id) ?: throw InvoiceNotFoundException(id)
     }
 
     private suspend fun initPendingInvoiceIterator(action: suspend (Invoice) -> Unit) = runBlocking {
@@ -56,12 +67,23 @@ class BillingService(
         }
     }
 
-    private suspend fun charge(invoice: Invoice): List<Event> {
+    private suspend fun charge(invoice: Invoice) {
+        val events = try { tryChargeInvoice(invoice) } catch (ex: Exception) { handleFailure(ex, invoice) }
+        events.forEach { ev -> eventNotificator.notify(ev) }
+        dal.updateInvoice(invoice)
+    }
+
+    private suspend fun tryChargeInvoice(invoice: Invoice): List<Event> {
         val events: MutableList<Event> = mutableListOf()
         val wasCharged = paymentProvider.charge(invoice)
         if (wasCharged) {
             invoice.pay()
-            val eventChange = InvoiceStatusChangedEvent(invoice.id, invoice.javaClass.simpleName, InvoiceStatus.PENDING.toString(), InvoiceStatus.PAID.toString())
+            val eventChange = InvoiceStatusChangedEvent(
+                invoice.id,
+                invoice.javaClass.simpleName,
+                InvoiceStatus.PENDING.toString(),
+                InvoiceStatus.PAID.toString()
+            )
             events.add(eventChange)
         } else {
             val reason = "Invoice charge declined due lack of account balance of customer '${invoice.customerId}'"
