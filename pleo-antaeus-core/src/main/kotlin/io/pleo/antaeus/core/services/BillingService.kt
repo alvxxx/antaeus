@@ -33,7 +33,7 @@ class BillingService(
         }
     }
 
-    fun markPendingInvoicesAsOverdue() = runBlocking {
+    fun overdueInvoices() = runBlocking {
         initPendingInvoiceIterator {
             it.overdue()
             val eventChange = InvoiceStatusChangedEvent(it.id, it.javaClass.simpleName, InvoiceStatus.PENDING.toString(), InvoiceStatus.OVERDUE.toString())
@@ -78,7 +78,9 @@ class BillingService(
             is CustomerNotFoundException -> {
                 invoice.uncollect()
                 val failureEvent = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
+                val eventChange = InvoiceStatusChangedEvent(invoice.id, invoice.javaClass.simpleName, InvoiceStatus.PENDING.toString(), InvoiceStatus.UNCOLLECTIBLE.toString())
                 events.add(failureEvent)
+                events.add(eventChange)
             }
             is NetworkException -> {
                 val failureEvent = ApplicationErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)

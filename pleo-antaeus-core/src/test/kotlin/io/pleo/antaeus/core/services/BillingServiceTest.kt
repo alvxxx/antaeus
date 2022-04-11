@@ -125,7 +125,7 @@ class BillingServiceTest {
         )
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
-        sut.markPendingInvoicesAsOverdue()
+        sut.overdueInvoices()
 
         verify {
             successInvoice1.overdue()
@@ -141,7 +141,7 @@ class BillingServiceTest {
         )
         every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
 
-        sut.markPendingInvoicesAsOverdue()
+        sut.overdueInvoices()
 
         coVerify(exactly = 2) { eventNotificator.notify(withArg <InvoiceStatusChangedEvent> {
             assertTrue(it.resourceName == "Invoice")
@@ -241,6 +241,24 @@ class BillingServiceTest {
             assertTrue(it.resourceName == "Invoice")
             assertTrue(it.resourceId == 1)
             assertTrue(it.reason == "Invoice charge declined due lack of account balance of customer '1'")
+        }) }
+    }
+
+    @Test
+    fun `will notify invoice changes to uncollect`() = runTest {
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, 0) } returns listOf(
+            mockInvoice(400),
+            mockInvoice(404)
+        )
+        every { dal.fetchInvoicePageByStatus(InvoiceStatus.PENDING, numberOfCoroutines, match { it > 2 }) } returns listOf()
+
+        sut.chargeInvoices()
+
+        coVerify(exactly = 2) { eventNotificator.notify(withArg <InvoiceStatusChangedEvent> {
+            assertTrue(it.resourceName == "Invoice")
+            assertTrue(it.resourceId == 1)
+            assertTrue(it.oldStatus == "PENDING")
+            assertTrue(it.newStatus == "UNCOLLECTIBLE")
         }) }
     }
 }

@@ -81,7 +81,7 @@ class AntaeusRest(
                         }
 
                         post("overdue") {
-                            it.initAsyncProcessor { billingService.markPendingInvoicesAsOverdue() }
+                            it.initAsyncProcessor { billingService.overdueInvoices() }
                         }
                     }
 
