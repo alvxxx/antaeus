@@ -27,8 +27,8 @@ class BillingService(
 
     fun chargeInvoices() = runBlocking {
         initPendingInvoiceIterator {
-            val failureEvent = try { charge(it) } catch (ex: Exception) { handleFailure(ex, it) }
-            failureEvent?.let { ev -> eventNotificator.notify(ev) }
+            val events = try { charge(it) } catch (ex: Exception) { handleFailure(ex, it) }
+            events.forEach { ev -> eventNotificator.notify(ev) }
             dal.updateInvoice(it)
         }
     }
@@ -56,32 +56,35 @@ class BillingService(
         }
     }
 
-    private suspend fun charge(invoice: Invoice): Event? {
-        var event: Event? = null
+    private suspend fun charge(invoice: Invoice): List<Event> {
+        val events: MutableList<Event> = mutableListOf()
         val wasCharged = paymentProvider.charge(invoice)
         if (wasCharged) {
             invoice.pay()
             val eventChange = InvoiceStatusChangedEvent(invoice.id, invoice.javaClass.simpleName, InvoiceStatus.PENDING.toString(), InvoiceStatus.PAID.toString())
-            eventNotificator.notify(eventChange)
+            events.add(eventChange)
         } else {
             val reason = "Invoice charge declined due lack of account balance of customer '${invoice.customerId}'"
-            event = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, reason)
+            val eventFailure = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, reason)
+            events.add(eventFailure)
         }
-        return event
+        return events
     }
 
-    private fun handleFailure(exception: Exception, invoice: Invoice): Event? {
-        var event: Event? = null
+    private fun handleFailure(exception: Exception, invoice: Invoice): List<Event> {
+        val events: MutableList<Event> = mutableListOf()
         when (exception) {
             is CurrencyMismatchException,
-            is CustomerNotFoundException
-                -> {
-                event = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
+            is CustomerNotFoundException -> {
                 invoice.uncollect()
+                val failureEvent = BusinessErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
+                events.add(failureEvent)
             }
-            is NetworkException
-                -> event = ApplicationErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
+            is NetworkException -> {
+                val failureEvent = ApplicationErrorEvent(invoice.id, invoice.javaClass.simpleName, exception = exception)
+                events.add(failureEvent)
+            }
         }
-        return event
+        return events
     }
 }
