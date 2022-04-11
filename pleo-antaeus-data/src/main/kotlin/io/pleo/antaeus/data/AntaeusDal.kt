@@ -44,14 +44,6 @@ class AntaeusDal(private val db: Database) {
         }
     }
 
-    fun updatePendingInvoicesAs(newStatus: InvoiceStatus) {
-        transaction(db){
-            InvoiceTable.update({ InvoiceTable.status eq InvoiceStatus.PENDING.toString() }) {
-                it[status] = newStatus.toString()
-            }
-        }
-    }
-
     fun updateInvoice(invoice: Invoice) {
         transaction(db){
             InvoiceTable.update({ InvoiceTable.id eq invoice.id }) {
