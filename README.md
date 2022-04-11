@@ -2,8 +2,10 @@
 I will create a retry policy on failures invoices that the charge was declined or that thrown NetworkException. The other ones I will mark them as `uncollectible`. At the beginning of the second day of month I will execute another process that will mark declined charges as `overdue`.
 
 ## 10 April 2022 - 3 hours
-I started the day, reviewing the current solution, trying to find any points of improvement before start the retry policy solution. I notice that the current solution was holding the http connection waiting for response instead of dispatch job and let the execution happen on background, so I added a solution that I found on Javalin documentation. Then I marked invoice charges that thrown CustomerNotFoundException and CurrencyMismatchException as uncollectible, as there's no way of charge those kind of invoices on future retries. And in the end, I refactored the existing process to handle coroutines to reuse algorithm on overdue service.     
+I started the day, reviewing the current solution, trying to find any points of improvement before start the retry policy solution. I notice that the current solution was holding the http connection waiting for response instead of dispatch job and let the execution happen on background, so I added a solution that I found on Javalin documentation. Then I marked invoice charges that thrown CustomerNotFoundException and CurrencyMismatchException as uncollectible, as there's no way of charge this kind of invoices on future retries. And in the end, I refactored the existing process to handle coroutines to reuse algorithm on overdue service.     
 
+## 11 April 2022 - 1:30 hours
+I refactored the FailureNotificator to be an EventNotificator that dispatches any important changes to interest parts. Then I triggered events to notify any status changes on invoices. 
 
 ## Resume of chapter
 
