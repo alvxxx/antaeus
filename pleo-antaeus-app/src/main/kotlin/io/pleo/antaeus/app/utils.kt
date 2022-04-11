@@ -1,8 +1,8 @@
 
 import io.pleo.antaeus.core.events.ApplicationErrorEvent
 import io.pleo.antaeus.core.events.BusinessErrorEvent
-import io.pleo.antaeus.core.events.FailureEvent
-import io.pleo.antaeus.core.external.FailureNotificator
+import io.pleo.antaeus.core.events.Event
+import io.pleo.antaeus.core.external.EventNotificator
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency
@@ -46,14 +46,14 @@ internal fun getPaymentProvider(): PaymentProvider {
     }
 }
 
-internal fun getFailureNotificator(): FailureNotificator {
-    return object : FailureNotificator {
-        val logger = LoggerFactory.getLogger("FailureNotificator")
+internal fun getEventNotificator(): EventNotificator {
+    return object : EventNotificator {
+        val logger = LoggerFactory.getLogger("EventNotificator")
 
-        override suspend fun notify(failure: FailureEvent) {
-            when(failure) {
-                is BusinessErrorEvent -> logger.info("The following failure occurred: ${failure.reason}")
-                is ApplicationErrorEvent -> logger.info("The following failure occurred: ${failure.exception.printStackTrace()}")
+        override suspend fun notify(event: Event) {
+            when(event) {
+                is BusinessErrorEvent -> logger.info("The following failure occurred: ${event.reason}")
+                is ApplicationErrorEvent -> logger.info("The following failure occurred: ${event.exception.printStackTrace()}")
             }
         }
     }

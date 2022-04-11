@@ -2,11 +2,11 @@ package io.pleo.antaeus.core.services
 
 import io.pleo.antaeus.core.events.ApplicationErrorEvent
 import io.pleo.antaeus.core.events.BusinessErrorEvent
-import io.pleo.antaeus.core.events.FailureEvent
+import io.pleo.antaeus.core.events.Event
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
 import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
 import io.pleo.antaeus.core.exceptions.NetworkException
-import io.pleo.antaeus.core.external.FailureNotificator
+import io.pleo.antaeus.core.external.EventNotificator
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Invoice
@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class BillingService(
     private val paymentProvider: PaymentProvider,
     private val dal: AntaeusDal,
-    private val failureNotificator: FailureNotificator,
+    private val eventNotificator: EventNotificator,
     private val numberOfCoroutines: Int = 16
 ) {
     private val logger = LoggerFactory.getLogger(javaClass.simpleName)
@@ -27,7 +27,7 @@ class BillingService(
     fun chargeInvoices() = runBlocking {
         initPendingInvoiceIterator {
             val failureEvent = try { charge(it) } catch (ex: Exception) { handleFailure(ex, it) }
-            failureEvent?.let { ev -> failureNotificator.notify(ev) }
+            failureEvent?.let { ev -> eventNotificator.notify(ev) }
             dal.updateInvoice(it)
         }
     }
@@ -53,8 +53,8 @@ class BillingService(
         }
     }
 
-    private suspend fun charge(invoice: Invoice): FailureEvent? {
-        var event: FailureEvent? = null
+    private suspend fun charge(invoice: Invoice): Event? {
+        var event: Event? = null
         val wasCharged = paymentProvider.charge(invoice)
         if (wasCharged) {
             invoice.pay()
@@ -66,8 +66,8 @@ class BillingService(
         return event
     }
 
-    private fun handleFailure(exception: Exception, invoice: Invoice): FailureEvent? {
-        var event: FailureEvent? = null
+    private fun handleFailure(exception: Exception, invoice: Invoice): Event? {
+        var event: Event? = null
         when (exception) {
             is CurrencyMismatchException,
             is CustomerNotFoundException

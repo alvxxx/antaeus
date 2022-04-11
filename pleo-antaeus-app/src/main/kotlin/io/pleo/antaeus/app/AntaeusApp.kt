@@ -7,7 +7,7 @@
 
 package io.pleo.antaeus.app
 
-import getFailureNotificator
+import getEventNotificator
 import getPaymentProvider
 import io.pleo.antaeus.core.services.BillingService
 import io.pleo.antaeus.core.services.CustomerService
@@ -56,14 +56,12 @@ fun main() {
 
     // Get third parties
     val paymentProvider = getPaymentProvider()
-    val failureNotificator = getFailureNotificator()
+    val eventNotificator = getEventNotificator()
 
     // Create core services
     val invoiceService = InvoiceService(dal = dal)
     val customerService = CustomerService(dal = dal)
-
-    // This is _your_ billing service to be included where you see fit
-    val billingService = BillingService(paymentProvider = paymentProvider, dal = dal, failureNotificator = failureNotificator)
+    val billingService = BillingService(paymentProvider = paymentProvider, dal = dal, eventNotificator = eventNotificator)
 
     // Create REST web service
     AntaeusRest(
