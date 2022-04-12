@@ -1,14 +1,28 @@
-## Chapter Three: Resilience Optimization
-I will create a retry policy on failures invoices that the charge was declined or that thrown NetworkException. The other ones I will mark them as `uncollectible`. At the beginning of the second day of month I will execute another process that will mark declined charges as `overdue`.
+## Talking about the final solution
+I delegate the responsibility to schedule the process execution to an external service, the AWS Event Bridge. The billing service is triggered via http request, and the process starts the asynchronous execution. I decided to follow this approach because it's possible to manually trigger the endpoint if it is necessary. Therefore, there are some cares that needs to be taken. The endpoints exposed for manage billings is an administrative endpoint and should not be exposed to external clients of the api. This concern is simply handled with an api gateway. All the endpoints of billing is async, i.e: the request is responded with status code 202 only and the process execution continues on background. The billing process is executed on first weekday of each month at 6am, 9am and 3pm. All the invoices that couldn't be charged due a lack of account balance or NetworkException in these three attempts will be marked as `overdue`. Invoices that have an issue that needs human intervention to be executed successfully, like due of a currency mismatch between invoice and customer, is marked as `uncollectable`. The development process is organized in chapter, and each chapter has the description of what I did in each day.
 
-## 10 April 2022 - 3 hours
-I started the day, reviewing the current solution, trying to find any points of improvement before start the retry policy solution. I notice that the current solution was holding the http connection waiting for response instead of dispatch job and let the execution happen on background, so I added a solution that I found on Javalin documentation. Then I marked invoice charges that thrown CustomerNotFoundException and CurrencyMismatchException as uncollectible, as there's no way of charge this kind of invoices on future retries. And in the end, I refactored the existing process to handle coroutines to reuse algorithm on overdue service.     
+| Chapters | Description                                                                                                                                                                                                       |                              Branch                              |
+|:--------:|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------:|
+|   one    | I was learning about the billing process and kotlin as well. I focused in create a simple solution of the problem with a good tests battery to support future changes.                                            |  **[Link](https://github.com/alvxxx/antaeus/tree/chapter-one)**  |
+|   two    | I focused to optimize the algorithm performance using coroutines and shared variables to handle racing conditions.                                                                                                |  **[Link](https://github.com/alvxxx/antaeus/tree/chapter-two)**  |
+|  three   | Optimized the resilience of the billing process, implementing a simple retry policy and process to handle inconsistency of status, i.e: mark invoices that could not be charged to `uncollectable` or `overdued`. | **[Link](https://github.com/alvxxx/antaeus/tree/chapter-three)** |
+|  spike   | An auxiliary branch that helped me to find a solution for the performance optimization using coroutines before implementing the solution of the chapter two using *TDD*.                                          |     **[Link](https://github.com/alvxxx/antaeus/tree/spike)**     |
 
-## 11 April 2022 - 5 hours
-I refactored the FailureNotificator to be an EventNotificator that dispatches any important changes to interest parts. Then I triggered events to notify any status changes on invoices. When I finished the refactor, I notice that the BillingService was having too many responsibilities, so I moved the async iterator over pending invoices to AntaeusDal. Continuing the refactoring, I created a new class called InvoiceDomainService that now contains the code that notify events and the code that handle invoice status changes. With that big change, I needed to move tests to your respective layers and needed to rewrite some others.   
+All development process was developed using the following:
 
-## Resume of chapter
-It was simple to implement the retry policy logic, it only needed to dispatch the scheduler expression to execute 3 times on a day on AWS Event Bridge Rule. Therefore, we needed to create another rule to mark invoices as `overdue` to handle with invoices that could not be charged because it happened a soft problem like, lack of customer account balance or the Payment Provider that becomes unavailable on the day. I also provided another endpoint to retry charge a specific invoice to handle overdue scenarios as told before. I believe that the service is ready to production, and it has a good design to support future features and improvements.
+> #### Principles
+- Small commits
+- Single Responsibility Principle (SRP)
+- Interface Segregation Principle (ISP)
+- Dependency Inversion Principle (DIP)
+- Don't Repeat Yourself (DRY)
+- Keep It Simple, Silly (KISS)
+
+> #### Methodologies and Design
+- *TDD*
+- Clean Architecture
+- DDD (Some concepts approached on book, like Domain service)
+- Conventional Commits
 
 ## Developing
 
