@@ -1,4 +1,3 @@
-
 CRON_INTERVAL="cron(0 9 1W * ? *)" # use this cron to force event creation to every first week day of the month
 AWS_REGION='us-east-1'
 AWS_ACCOUNT='000000000000'
