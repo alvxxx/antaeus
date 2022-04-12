@@ -1,10 +1,3 @@
-## Talking about the solution I want to achieve
-I will delegate the schedule process execution responsibility to an external service, the AWS Event Bridge. The billing service will listen an event and will dispatch a request to a billing endpoint that will dispatch the process execution. With asynchronous process handlers in mind, I need to ensure idempotency, achieve a good failure handling and have a well-designed retry policy.
-
-## How I will manage the development process?
-I will separate the development in chapters each one with your own branch and the main branch will contain the final solution.
-
----
 ## Chapter One: MVP
 This chapter goal is to obtain a simple solution, creating as many tests as possible to reach stability for future improvements, as performance and resilience. As I am still learning about the billing process, and I don't know in first-hand which are the load that this system will handle.  
 
