@@ -1,28 +1,13 @@
-## Talking about the final solution
-I delegate the responsibility to schedule the process execution to an external service, the AWS Event Bridge. The billing service is triggered via http request, and the process starts the asynchronous execution. I decided to follow this approach because it's possible to manually trigger the endpoint if it is necessary. Therefore, there are some cares that needs to be taken. The endpoints exposed for manage billings is an administrative endpoint and should not be exposed to external clients of the api. This concern is simply handled with an api gateway. All the endpoints of billing is async, i.e: the request is responded with status code 202 only and the process execution continues on background. The billing process is executed on first weekday of each month at 6am, 9am and 3pm. All the invoices that couldn't be charged due a lack of account balance or NetworkException in these three attempts will be marked as `overdue`. Invoices that have an issue that needs human intervention to be executed successfully, like due of a currency mismatch between invoice and customer, is marked as `uncollectable`. The development process is organized in chapter, and each chapter has the description of what I did in each day.
+## Chapter Four: Bonus
+After complete the challenge, I read the book Kotlin Design Patterns and Best Practices that approach some design patterns to build coroutines. On the book, there is a chapter that compares concurrency x parallelism, and I realized that the application was optimized through parallelism but when the process to fetch page was called, the thread was awaiting the response to continues the process and that's not the desired behavior. So I decided to go back to project, and make some changes. First I used the coroutine function `useContext` to run a code block in asynchronous way. So, I changed `fetchInvoicePageByStatus` and `updateInvoice`to apply the `useContext`. After that, I notice that I was using `runBlocking` that awaits the method to finish instead to suspending the coroutine and continue, so I changed each `runBlocking` to `coroutineScope`, except in the rest layer. I also did some changes to remove the boilerplate on using the `initAsyncProcessor` function. After all, the last change was add `"-opt-in=kotlin.RequiresOptIn"` on `build.gradle.kts` to suppress the warning when uses Kotlin Coroutine Test library. Lastly, I tested the overdue service applying a `Thread.sleep(60)` on `fetchInvoicePageByStatus` and `updateInvoice` with and without `useContext` and that it was the results:
 
-| Chapters | Description                                                                                                                                                                                                       |                              Branch                              |
-|:--------:|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------:|
-|   one    | I was learning about the billing process and kotlin as well. I focused in create a simple solution of the problem with a good tests battery to support future changes.                                            |  **[Link](https://github.com/alvxxx/antaeus/tree/chapter-one)**  |
-|   two    | I focused to optimize the algorithm performance using coroutines and shared variables to handle racing conditions.                                                                                                |  **[Link](https://github.com/alvxxx/antaeus/tree/chapter-two)**  |
-|  three   | Optimized the resilience of the billing process, implementing a simple retry policy and process to handle inconsistency of status, i.e: mark invoices that could not be charged to `uncollectable` or `overdued`. | **[Link](https://github.com/alvxxx/antaeus/tree/chapter-three)** |
-|  spike   | An auxiliary branch that helped me to find a solution for the performance optimization using coroutines before implementing the solution of the chapter two using *TDD*.                                          |     **[Link](https://github.com/alvxxx/antaeus/tree/spike)**     |
+| Using                             | Time taken |
+|:----------------------------------|:----------:|
+| `runBlocking` only                | 9 seconds  |
+| `coroutineScope` only             | 5 seconds  |
+| `useContext` and `coroutineScope` | 2 seconds  |
 
-All development process was developed using the following:
-
-> #### Principles
-- Small commits
-- Single Responsibility Principle (SRP)
-- Interface Segregation Principle (ISP)
-- Dependency Inversion Principle (DIP)
-- Don't Repeat Yourself (DRY)
-- Keep It Simple, Silly (KISS)
-
-> #### Methodologies and Design
-- *TDD*
-- Clean Architecture
-- DDD (Some concepts approached on book, like Domain service)
-- Conventional Commits
+Ps: Total invoices marked as overdue was 52 in each case.
 
 ## Developing
 
