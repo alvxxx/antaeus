@@ -7,30 +7,32 @@
 
 package io.pleo.antaeus.data
 
-import io.pleo.antaeus.models.Currency
-import io.pleo.antaeus.models.Customer
-import io.pleo.antaeus.models.Invoice
-import io.pleo.antaeus.models.InvoiceStatus
-import io.pleo.antaeus.models.Money
+import io.pleo.antaeus.models.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.concurrent.atomic.AtomicInteger
 
 class AntaeusDal(private val db: Database) {
-    fun fetchInvoice(id: Int): Invoice? {
-        // transaction(db) runs the internal query as a new database transaction.
-        return transaction(db) {
-            // Returns the first invoice with matching id.
+    fun fetchInvoice(id: Int): Invoice? =
+        transaction(db) {
             InvoiceTable
                 .select { InvoiceTable.id.eq(id) }
                 .firstOrNull()
                 ?.toInvoice()
         }
-    }
 
-    suspend fun onEveryPendingInvoice(numberOfCoroutines: Int = 16, action: suspend (Invoice) -> Unit) = runBlocking {
+    fun fetchInvoices(): List<Invoice> =
+        transaction(db) {
+            InvoiceTable
+                .selectAll()
+                .map { it.toInvoice() }
+        }
+
+    suspend fun onEveryPendingInvoice(numberOfCoroutines: Int = 16, action: suspend (Invoice) -> Unit) = coroutineScope {
         val currentPage = AtomicInteger(-numberOfCoroutines)
         repeat(numberOfCoroutines) {
             launch {
@@ -43,33 +45,28 @@ class AntaeusDal(private val db: Database) {
         }
     }
 
-    fun fetchInvoices(): List<Invoice> {
-        return transaction(db) {
-            InvoiceTable
-                .selectAll()
-                .map { it.toInvoice() }
-        }
-    }
-
-    fun fetchInvoicePageByStatus(status: InvoiceStatus, take: Int, pageNumber: Int): List<Invoice> {
-        return transaction(db) {
-            InvoiceTable
-                .select { InvoiceTable.status like status.toString() }
-                .limit(take, pageNumber)
-                .map { it.toInvoice() }
-        }
-    }
-
-    fun updateInvoice(invoice: Invoice) {
-        transaction(db){
-            InvoiceTable.update({ InvoiceTable.id eq invoice.id }) {
-                it[status] = invoice.status.toString()
-                it[currency] = invoice.amount.currency.toString()
-                it[customerId] = invoice.customerId
-                it[value] = invoice.amount.value
+    internal suspend fun fetchInvoicePageByStatus(status: InvoiceStatus, take: Int, pageNumber: Int): List<Invoice> =
+        withContext(Dispatchers.IO) {
+            transaction(db) {
+                InvoiceTable
+                    .select { InvoiceTable.status eq status.toString() }
+                    .limit(take, pageNumber)
+                    .map { it.toInvoice() }
             }
         }
-    }
+
+    suspend fun updateInvoice(invoice: Invoice) =
+        withContext(Dispatchers.IO) {
+            transaction(db) {
+                InvoiceTable.update({ InvoiceTable.id eq invoice.id }) {
+                    it[status] = invoice.status.toString()
+                    it[currency] = invoice.amount.currency.toString()
+                    it[customerId] = invoice.customerId
+                    it[value] = invoice.amount.value
+                }
+            }
+        }
+
 
     fun createInvoice(amount: Money, customer: Customer, status: InvoiceStatus = InvoiceStatus.PENDING): Invoice? {
         val id = transaction(db) {
@@ -82,26 +79,23 @@ class AntaeusDal(private val db: Database) {
                     it[this.customerId] = customer.id
                 } get InvoiceTable.id
         }
-
         return fetchInvoice(id)
     }
 
-    fun fetchCustomer(id: Int): Customer? {
-        return transaction(db) {
+    fun fetchCustomer(id: Int): Customer? =
+        transaction(db) {
             CustomerTable
                 .select { CustomerTable.id.eq(id) }
                 .firstOrNull()
                 ?.toCustomer()
         }
-    }
 
-    fun fetchCustomers(): List<Customer> {
-        return transaction(db) {
+    fun fetchCustomers(): List<Customer> =
+        transaction(db) {
             CustomerTable
                 .selectAll()
                 .map { it.toCustomer() }
         }
-    }
 
     fun createCustomer(currency: Currency): Customer? {
         val id = transaction(db) {

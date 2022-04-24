@@ -42,7 +42,7 @@ class BillingServiceTest {
 
         sut.charge(invoice)
 
-        verify(exactly = 1) { dal.updateInvoice(invoice) }
+        coVerify(exactly = 1) { dal.updateInvoice(invoice) }
     }
 
     @Test
@@ -51,7 +51,7 @@ class BillingServiceTest {
 
         sut.overdue(invoice)
 
-        verify(exactly = 1) { dal.updateInvoice(invoice) }
+        coVerify(exactly = 1) { dal.updateInvoice(invoice) }
     }
 
     @Test

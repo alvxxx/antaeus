@@ -8,22 +8,22 @@ import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.services.InvoiceDomainService
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.coroutineScope
 
 class BillingService(
     private val paymentProvider: PaymentProvider,
     private val dal: AntaeusDal,
     private val domainService: InvoiceDomainService
 ) {
-    fun chargeInvoices() = runBlocking {
+    suspend fun chargeInvoices() = coroutineScope {
         dal.onEveryPendingInvoice { charge(it) }
     }
 
-    fun overdueInvoices() = runBlocking {
+    suspend fun overdueInvoices() = coroutineScope {
         dal.onEveryPendingInvoice { overdue(it) }
     }
 
-    fun chargeInvoiceById(id: Int) = runBlocking {
+    suspend fun chargeInvoiceById(id: Int) = coroutineScope {
         when(val it =  dal.fetchInvoice(id)?: InvoiceNotFoundException(id)) {
             is Invoice -> charge(it)
             is InvoiceNotFoundException -> domainService.fail(id, it)
