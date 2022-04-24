@@ -7,6 +7,7 @@ I delegate the responsibility to schedule the process execution to an external s
 |   two    | I focused to optimize the algorithm performance using coroutines and shared variables to handle racing conditions.                                                                                                |  **[Link](https://github.com/alvxxx/antaeus/tree/chapter-two)**  |
 |  three   | Optimized the resilience of the billing process, implementing a simple retry policy and process to handle inconsistency of status, i.e: mark invoices that could not be charged to `uncollectable` or `overdued`. | **[Link](https://github.com/alvxxx/antaeus/tree/chapter-three)** |
 |  spike   | An auxiliary branch that helped me to find a solution for the performance optimization using coroutines before implementing the solution of the chapter two using *TDD*.                                          |     **[Link](https://github.com/alvxxx/antaeus/tree/spike)**     |
+|   four   | A bonus chapter that I optimized the billing service for concurrency, after read the book "Kotlin Design Patterns and Best Practices".                                                                            | **[Link](https://github.com/alvxxx/antaeus/tree/chapter-four)**  |
 
 All development process was developed using the following:
 
