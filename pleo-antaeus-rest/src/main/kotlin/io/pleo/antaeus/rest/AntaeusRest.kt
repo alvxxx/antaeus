@@ -11,6 +11,7 @@ import io.pleo.antaeus.core.exceptions.EntityNotFoundException
 import io.pleo.antaeus.core.services.BillingService
 import io.pleo.antaeus.core.services.CustomerService
 import io.pleo.antaeus.core.services.InvoiceService
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
@@ -47,14 +48,17 @@ class AntaeusRest(
             error(404) { ctx -> ctx.json("not found") }
         }
 
-    private fun Context.initAsyncProcessor(action: Runnable) {
+    private fun Context.initAsyncProcessor(action:  suspend CoroutineScope.() -> Unit) {
+        val command = {
+            val executionTime = measureTimeMillis {
+                runBlocking { action.invoke(this) }
+            }
+            logger.info("The service time execution was: ${executionTime/1000} s")
+        }
         this.future(CompletableFuture<Unit>().apply {
             Executors
                 .newSingleThreadScheduledExecutor()
-                .schedule({
-                    val executionTime = measureTimeMillis { action.run() }
-                    logger.info("The service time execution was: ${executionTime/1000} s")
-                }, 1, TimeUnit.SECONDS)
+                .schedule(command, 1, TimeUnit.SECONDS)
         })
         this.json("Accepted")
         this.status(202)
@@ -77,14 +81,18 @@ class AntaeusRest(
                 path("v1") {
                     path("billing") {
                         // URL: /rest/v1/billing
-                        post("charge") { it.initAsyncProcessor { billingService.chargeInvoices() }}
+                        post("charge") {
+                            it.initAsyncProcessor { billingService.chargeInvoices() }
+                        }
 
                         post("charge/{id}") {
                             val id = it.pathParam("id").toInt()
                             it.initAsyncProcessor{ billingService.chargeInvoiceById(id) }
                         }
 
-                        post("overdue") { it.initAsyncProcessor { billingService.overdueInvoices() } }
+                        post("overdue") {
+                            it.initAsyncProcessor { billingService.overdueInvoices() }
+                        }
                     }
 
                     path("invoices") {
